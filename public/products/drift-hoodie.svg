@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 800">
+  <defs>
+    <radialGradient id="bg" cx="50%" cy="35%" r="75%"><stop offset="0" stop-color="#EEF0E8"/><stop offset="1" stop-color="#DADFD2"/></radialGradient>
+    <linearGradient id="cloth" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#355A43"/><stop offset=".5" stop-color="#2A4A37"/><stop offset="1" stop-color="#1D3527"/></linearGradient>
+    <filter id="blur"><feGaussianBlur stdDeviation="18"/></filter>
+  </defs>
+  <rect width="800" height="800" fill="url(#bg)"/>
+  <ellipse cx="400" cy="680" rx="230" ry="22" fill="#1F3D2B" opacity=".22" filter="url(#blur)"/>
+  <path d="M310 190 q90 -60 180 0 l120 50 q40 18 50 60 l40 250 q5 30 -25 34 l-50 6 q-25 2 -30 -22 l-35 -190 v300 q0 20 -20 20 h-260 q-20 0 -20 -20 v-300 l-35 190 q-5 24 -30 22 l-50 -6 q-30 -4 -25 -34 l40 -250 q10 -42 50 -60z" fill="url(#cloth)"/>
+  <path d="M320 195 q80 120 160 0 q-20 -70 -80 -70 q-60 0 -80 70z" fill="#16291D"/>
+  <path d="M335 200 q65 90 130 0" stroke="#3E6A50" stroke-width="10" fill="none"/>
+  <path d="M385 265 l-8 110 M415 265 l8 110" stroke="#D9D3C2" stroke-width="5" stroke-linecap="round"/>
+  <circle cx="377" cy="380" r="7" fill="#D9D3C2"/><circle cx="423" cy="380" r="7" fill="#D9D3C2"/>
+  <path d="M320 470 h160 l-15 90 h-130z" fill="#22402F" stroke="#1A3124" stroke-width="4"/>
+  <path d="M260 640 h280" stroke="#1A3124" stroke-width="22" stroke-linecap="round"/>
+  <path d="M250 300 l-20 160" stroke="#fff" stroke-width="10" opacity=".06" stroke-linecap="round"/>
+</svg>

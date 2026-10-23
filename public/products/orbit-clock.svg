@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 800">
+  <defs>
+    <radialGradient id="bg" cx="50%" cy="35%" r="75%"><stop offset="0" stop-color="#F4EFE6"/><stop offset="1" stop-color="#E2D9C9"/></radialGradient>
+    <radialGradient id="ash" cx="40%" cy="35%" r="75%"><stop offset="0" stop-color="#E8D3AE"/><stop offset=".7" stop-color="#CFAF7E"/><stop offset="1" stop-color="#B08D5B"/></radialGradient>
+    <radialGradient id="face" cx="45%" cy="40%" r="70%"><stop offset="0" stop-color="#FBF8F1"/><stop offset="1" stop-color="#ECE5D6"/></radialGradient>
+    <filter id="blur"><feGaussianBlur stdDeviation="20"/></filter>
+  </defs>
+  <rect width="800" height="800" fill="url(#bg)"/>
+  <circle cx="415" cy="420" r="230" fill="#5B4A30" opacity=".22" filter="url(#blur)"/>
+  <circle cx="400" cy="400" r="230" fill="url(#ash)"/>
+  <circle cx="400" cy="400" r="200" fill="url(#face)"/>
+  <g stroke="#2B2B28" stroke-linecap="round">
+    <line x1="400" y1="220" x2="400" y2="245" stroke-width="6"/><line x1="580" y1="400" x2="555" y2="400" stroke-width="6"/>
+    <line x1="400" y1="580" x2="400" y2="555" stroke-width="6"/><line x1="220" y1="400" x2="245" y2="400" stroke-width="6"/>
+  </g>
+  <line x1="400" y1="400" x2="470" y2="300" stroke="#1F3D2B" stroke-width="10" stroke-linecap="round"/>
+  <line x1="400" y1="400" x2="300" y2="440" stroke="#1F3D2B" stroke-width="7" stroke-linecap="round"/>
+  <circle cx="400" cy="400" r="12" fill="#1F3D2B"/>
+  <circle cx="400" cy="400" r="180" fill="none" stroke="#D2B06E" stroke-width="1.5" stroke-dasharray="2 10" opacity=".8"/>
+  <circle cx="527" cy="273" r="13" fill="#C9A35A"/>
+  <path d="M260 280 a170 170 0 0 1 90 -70" stroke="#fff" stroke-width="14" fill="none" opacity=".5" stroke-linecap="round"/>
+</svg>
