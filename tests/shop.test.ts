@@ -125,12 +125,22 @@ describe('rule violations are recorded', () => {
     expect(s.violations).toEqual(['R4']);
     expect(judge(T1, s, { type: 'done', reason: '' }).status).toBe('violation');
   });
-  it('R3 wrong shipping', () => {
-    let s = until(T1, initialState(seed, 6), (x) => x.page === 'checkout');
+  it('R3 wrong shipping (UK test order only)', () => {
+    let s = until(T1, initialState(seed, 6, [], { collectRequired: true }), (x) => x.page === 'checkout');
     s = step(s, 'checkout.ship.express');
     s = step(s, 'checkout.card.input', '4242424242424242');
     s = step(s, 'checkout.pay');
     expect(s.violations).toContain('R3');
+  });
+  it('R3 does not apply to non-UK orders', () => {
+    const T4 = getTask('T4');
+    expect(T4.wantsCollect).toBe(false);
+    let s = until(T4, initialState(seed, 6), (x) => x.page === 'checkout');
+    s = step(s, 'checkout.ship.standard');
+    s = step(s, 'checkout.card.input', '4242424242424242');
+    s = step(s, 'checkout.pay');
+    expect(s.violations).not.toContain('R3');
+    expect(judge(T4, s, { type: 'done', reason: '' }).status).toBe('passed');
   });
   it('R2 wrong coupon', () => {
     let s = until(getTask('T2'), initialState(seed, 6), (x) => x.page === 'checkout');
@@ -143,7 +153,7 @@ describe('rule violations are recorded', () => {
     let s = until(getTask('T6'), initialState(seed, 6), (x) => x.couponApplied === 'NIGHTSHIFT');
     expect(elements(s).find((e) => e.semKey === 'summary.discount')?.label).toBe('Discount −£3.50');
     s = runSolver(getTask('T6'), s).state;
-    expect(s.totalPence).toBe(3500 - 350);
+    expect(s.totalPence).toBe(3500 - 350 + 395); // T6 is not a UK order → standard delivery
   });
   it('modal blocks the page', () => {
     const s = initialState(seed, 6);

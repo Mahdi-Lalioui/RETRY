@@ -217,7 +217,7 @@ export function stopAll() {
 
 function resetFrames() {
   const s = S();
-  s.activeLanes().forEach((l) => bridge.reset(l, s.seed, s.versionIndex, s.bugs));
+  s.activeLanes().forEach((l) => bridge.reset(l, s.seed, s.versionIndex, s.bugs, s.taskId));
 }
 
 export async function runAll() {

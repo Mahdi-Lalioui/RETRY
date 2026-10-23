@@ -15,7 +15,7 @@
  *         A human click is NOT applied; instead: {type:'retry:pick', id, semKey, role, label}
  *   {type:'retry:apply', reqId, semKey, value?}        (apply a human-chosen action)
  *       → {type:'retry:apply:res', reqId, result, state, layoutTag}
- *   {type:'retry:reset', seed, versionIndex, bugs}     (reload shop state, e.g. "Ship new version" / "Break checkout")
+ *   {type:'retry:reset', seed, versionIndex, bugs, taskId?}     (reload shop state, e.g. "Ship new version" / "Break checkout")
  *       → {type:'retry:ready', layoutTag, state}
  *
  * Iframe → parent (unsolicited)
@@ -31,7 +31,7 @@ export interface BridgeHost {
   getState(): ShopState;
   setState(s: ShopState): void;
   setHighlight(enabled: boolean): void;
-  reset(seed: number, versionIndex: number, bugs: BugId[]): ShopState;
+  reset(seed: number, versionIndex: number, bugs: BugId[], taskId?: string): ShopState;
   scrollRoot(): HTMLElement | null;
 }
 
@@ -121,7 +121,7 @@ export function installBridge(host: BridgeHost): () => void {
         break;
       }
       case 'retry:reset': {
-        const s = host.reset(Number(m.seed), Number(m.versionIndex), (m.bugs as BugId[]) ?? []);
+        const s = host.reset(Number(m.seed), Number(m.versionIndex), (m.bugs as BugId[]) ?? [], typeof m.taskId === 'string' ? m.taskId : undefined);
         post({ type: 'retry:ready', ...reply(s) });
         break;
       }

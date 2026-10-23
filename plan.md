@@ -404,7 +404,7 @@ React components never hold their own state. They render `ShopState` and dispatc
 |---|---|---|
 | R1 | Always decline the Protection Plan upsell | `upsell.accept` clicked |
 | R2 | When a task says "test coupon", use `NIGHTSHIFT` | coupon applied ≠ `NIGHTSHIFT` or task completes without it |
-| R3 | UK test orders use "Collect in store" | order placed with shipping ≠ `collect` when task `wantsCollect` (all UK test orders → default true for most tasks) |
+| R3 | UK test orders use "Collect in store" | order placed with shipping ≠ `collect` when task `wantsCollect` (only UK test orders: T1, T3, T5, T7, T11 — goal text contains "(UK test order)") |
 | R4 | Pay with test card `4242 4242 4242 4242`; never "Pay with saved card" | `checkout.pay.saved` clicked, or card ≠ test card |
 | R5 | Cookies: "Essential only", never "Accept all" | `cookies.all` clicked |
 | R6 | Ignore the "Continue" button inside the newsletter box | `newsletter.continue` clicked (it subscribes and navigates home — a trap) |
@@ -1022,7 +1022,7 @@ export const TASKS: Task[]; export function getTask(id: string): Task;
 // lib/shop/rules.ts
 export const RULES: Record<RuleId, { id: RuleId; title: string; short: string }>;
 // lib/shop/engine.ts
-export function initialState(seed: number, versionIndex: number, bugs?: BugId[]): ShopState;
+export function initialState(seed: number, versionIndex: number, bugs?: BugId[], opts?: { collectRequired?: boolean }): ShopState; // opts additive (Agent E): engine records R3 only when collectRequired (stored on ShopStateX.ui)
 export function applyAction(state: ShopState, semKey: string, value?: string): { state: ShopState; effect: 'ok' | 'no_effect' };
 export function elements(state: ShopState): AgentElement[];           // ids e1..eN
 export function resolveTarget(state: ShopState, id: string): string | undefined; // id -> semKey
@@ -1051,7 +1051,7 @@ export const LANES: Record<LaneId, { id: LaneId; label: string; color: string; m
 export const repo: { runs, steps, corrections, versions, evals }  // insert/update/get/list per table
 ```
 
-Mock model semantics (lib/mubit/mock.ts): `model` strings are `closed:<id>`, `open:<id>`; the mock reads the snapshot text in the last user message and returns JSON actions. Base/open v1 deliberately breaks rules R1–R7 at rule moments; an open model with a `versionId` follows every rule that has ≥1 correction in that version's training set (`repo.versions` / corrections with `versionId`), so lift is driven by real stored corrections, never hard-coded. Closed lane follows ~R5/R1 only half the time (seeded) and is slower/costlier.
+Mock model semantics (lib/mubit/mock.ts): `model` strings are `closed:<id>`, `open:<id>`; the mock reads the snapshot text in the last user message and returns JSON actions. Base/open v1 deliberately breaks rules R1–R7 at rule moments; an open model with a `versionId` follows every rule that has ≥1 correction in that version's training set (`repo.versions` / corrections with `versionId`), so lift is driven by real stored corrections, never hard-coded. Closed lane = smart general model without org knowledge: follows R1/R5/R6 ~93% (seeded), uses the 4242 test card instead of the saved card ~93% (R4 = common QA practice), never knows R2 (NIGHTSHIFT), R3 (UK collect) or R7; slower/costlier. Learned R3 → collect only when the goal says UK test order.
 
 **Let's win this.**
 
@@ -1067,7 +1067,7 @@ All messages are `window.postMessage` between Mission Control (parent) and the s
 | parent → iframe | `{type:'retry:act', reqId, action: AgentAction}` | during animation `{type:'retry:cursor', x, y, pressed?}` (move, then `pressed:true`, then `pressed:false` after apply); then `{type:'retry:act:res', reqId, result: StepResult, semKey?, state, layoutTag}`. Acts are queued (serial). `type` animates characters at 25ms; `scroll` scrolls 400px; `done`/`report_bug` return `ok` with no change. |
 | parent → iframe | `{type:'retry:highlight', enabled}` | rescue-hover mode: amber outline + chip `e3 · button · Not now`. Human clicks are NOT applied; iframe posts `{type:'retry:pick', id, semKey, role, label}` |
 | parent → iframe | `{type:'retry:apply', reqId, semKey, value?}` | applies a human-chosen action via `applyAction`; `{type:'retry:apply:res', reqId, result:'ok'\|'no_effect', state, layoutTag}` |
-| parent → iframe | `{type:'retry:reset', seed, versionIndex, bugs}` | rebuilds `initialState`; replies `{type:'retry:ready', layoutTag, state}` |
+| parent → iframe | `{type:'retry:reset', seed, versionIndex, bugs, taskId?}` | rebuilds `initialState` (taskId → collectRequired; omitted = keep current); replies `{type:'retry:ready', layoutTag, state}` |
 | iframe → parent | `{type:'retry:ready', layoutTag, state}` | on mount and after reset |
 | iframe → parent | `{type:'retry:state', state, layoutTag}` | after a human interacts with the shop directly (outside highlight mode) |
 

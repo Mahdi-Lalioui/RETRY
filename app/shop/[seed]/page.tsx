@@ -15,5 +15,5 @@ export default async function ShopPage({ params, searchParams }: { params: Promi
   const safeSeed = Number.isFinite(seed) ? seed : 1;
   const safeV = Number.isFinite(v) ? v : 1;
   // lane & task are read by the parent (Mission Control); the shop itself is lane-agnostic.
-  return <ShopShell key={`${safeSeed}:${safeV}:${bugs.join(',')}`} seed={safeSeed} versionIndex={safeV} bugs={bugs} />;
+  return <ShopShell key={`${safeSeed}:${safeV}:${bugs.join(',')}:${one(sp.task) ?? ''}`} seed={safeSeed} versionIndex={safeV} bugs={bugs} taskId={one(sp.task)} />;
 }

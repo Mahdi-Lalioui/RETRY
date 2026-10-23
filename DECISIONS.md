@@ -12,3 +12,6 @@
 - [D] Updated tests/api.test.ts expectation: refresh now evaluates v1+v2 on 48 runs, so the board's base row has 48 runs.
 - Live rescues only on Base and RETRY lanes; GPT and ICL lanes end with their violation verdict (keeps the stage demo readable).
 - Modal overlay in the shop uses a solid dim instead of backdrop-blur (Chromium mirrors edges inside scaled iframes).
+- [E] R3 is task-scoped: UK test orders = T1, T3, T5, T7, T11 (5/12; T9 dropped from the suggested set so a general model has 4 org-rule-free tasks); engine records R3 only with `ui.collectRequired`.
+- [E] Closed mock = general QA sense: R1/R5/R6 and R4 (4242 card) each ~93%, never R2/R3/R7; R4 coin keyed per run's checkout labels, coins avalanche-mixed (FNV suffix correlation made "50%" coins far off).
+- [E] Non-UK orders: solver/mock choose standard delivery; bridge `retry:reset` takes optional taskId (omitted = keep current collect requirement).

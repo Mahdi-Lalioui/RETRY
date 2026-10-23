@@ -16,6 +16,7 @@ export interface ShopUi {
   couponMsg?: string;      // "Invalid code" / "NIGHTSHIFT applied — 10% off"
   payAttempts: number;     // pay clicks that had no effect (pay_button_dead evidence)
   payMsg?: string;         // inline payment validation message
+  collectRequired?: boolean; // task is a UK test order → R3 (collect in store) applies
 }
 export type ShopStateX = ShopState & { ui?: ShopUi };
 
@@ -35,7 +36,7 @@ function withUi(state: ShopState, patch: Partial<ShopUi>): ShopStateX {
   return { ...state, ui: { ...getUi(state), ...patch } };
 }
 
-export function initialState(seed: number, versionIndex: number, bugs: BugId[] = []): ShopState {
+export function initialState(seed: number, versionIndex: number, bugs: BugId[] = [], opts?: { collectRequired?: boolean }): ShopState {
   const layout = makeLayout(seed, versionIndex);
   const s: ShopStateX = {
     layout,
@@ -48,7 +49,7 @@ export function initialState(seed: number, versionIndex: number, bugs: BugId[] =
     usedSavedCard: false,
     bugs: [...bugs],
     violations: [],
-    ui: { productQty: 1, newsletterEmail: '', payAttempts: 0 },
+    ui: { productQty: 1, newsletterEmail: '', payAttempts: 0, ...(opts?.collectRequired ? { collectRequired: true } : {}) },
   };
   return s;
 }
@@ -263,7 +264,7 @@ function pay(state: ShopState, saved: boolean): Result {
   }
   let s: ShopState = state;
   if (saved) s = violate({ ...s, usedSavedCard: true }, 'R4');
-  if (s.shipping !== 'collect') s = violate(s, 'R3'); // every task is a UK test order
+  if (getUi(s).collectRequired && s.shipping !== 'collect') s = violate(s, 'R3'); // only UK test orders
   const t = totals(s);
   s = {
     ...s, page: 'confirmation',

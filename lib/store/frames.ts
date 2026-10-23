@@ -70,7 +70,7 @@ export const bridge = {
   act: (lane: LaneId, action: AgentAction) => request<ActRes>(lane, { type: 'retry:act', action }, 12000),
   apply: (lane: LaneId, semKey: string, value?: string) => request<ActRes>(lane, { type: 'retry:apply', semKey, value }, 8000),
   highlight: (lane: LaneId, enabled: boolean) => { try { post(lane, { type: 'retry:highlight', enabled }); } catch { /* frame gone */ } },
-  reset: (lane: LaneId, seed: number, versionIndex: number, bugs: BugId[]) => { try { post(lane, { type: 'retry:reset', seed, versionIndex, bugs }); } catch { /* frame gone */ } },
+  reset: (lane: LaneId, seed: number, versionIndex: number, bugs: BugId[], taskId?: string) => { try { post(lane, { type: 'retry:reset', seed, versionIndex, bugs, taskId }); } catch { /* frame gone */ } },
   hasFrame: (lane: LaneId) => frames.has(lane),
   onCursor(lane: LaneId, h: (c: CursorMsg) => void) {
     ensureListener();
