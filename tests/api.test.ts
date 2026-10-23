@@ -93,6 +93,8 @@ describe('API routes (mock + memory)', () => {
     for (let i = 0; i < 3; i++) { s = await json(await evalStatus(get(`?evalId=${e.data.evalId}`))); if (s.data.finished) break; }
     expect(s.data).toMatchObject({ done: 4, total: 4, finished: true });
     const m = await json(await metrics(get('?scope=heldout')));
-    expect(m.data.rows[0].runs).toBe(4);
+    // Agent D: refresh now runs the 48-run held-out eval (v1 + v2) before promotion, so the board prefers those rows.
+    expect(s.data.partialMetrics.runs).toBe(4);
+    expect(m.data.rows.find((r: { lane: string }) => r.lane === 'base').runs).toBe(48);
   });
 });

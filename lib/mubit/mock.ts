@@ -2,6 +2,7 @@
 // Deterministic. Reads GOAL + snapshot text (format §9.1) from the last user message; no shop internals.
 // Rule following is driven by REAL stored corrections: a versioned open model follows rule R iff the
 // version's training set (model_versions.rules, computed from corrections at refresh time) contains R.
+import { AsyncLocalStorage } from 'node:async_hooks';
 import { nanoid } from 'nanoid';
 import type { ChatReq, ChatRes, FeedbackReq, ModelVersionInfo, MubitClient, Msg } from './types';
 import type { AgentAction } from '@/lib/agent/types';
@@ -255,6 +256,11 @@ export function readPrompt(messages: Msg[]) {
 // ---------- client ----------
 const sleep = (ms: number) => (ms > 0 ? new Promise((r) => setTimeout(r, ms)) : Promise.resolve());
 
+// Added by Agent D (additive): eval/bootstrap run the mock with zero wall-clock delay. Reported latencyMs is unchanged
+// (still the simulated figure), only the sleep is skipped, so a 48-run held-out eval finishes in seconds.
+const fastScope = new AsyncLocalStorage<boolean>();
+export function withMockFast<T>(fn: () => Promise<T>): Promise<T> { return fastScope.run(true, fn); }
+
 const g = globalThis as unknown as { __mubitMockFeedback?: { id: string; at: string; f: FeedbackReq }[] };
 export function mockFeedbackLog() { return (g.__mubitMockFeedback ??= []); }
 
@@ -301,7 +307,7 @@ export function createMockClient(): MubitClient {
       const h = hash(`${key}|lat|${req.metadata?.stepIdx ?? ''}`);
       const base = closed ? 900 + (h % 701) : 300 + (h % 301);
       const latencyMs = Math.round(base + (closed ? 0 : Math.max(0, chars - 3000) / 40));
-      await sleep(latencyMs * c.mockLatencyScale);
+      await sleep(fastScope.getStore() ? 0 : latencyMs * c.mockLatencyScale);
       return { text, callId: `mock_${nanoid(12)}`, usage: { in: Math.ceil(chars / 4), out: Math.ceil(text.length / 4) + 8 }, latencyMs };
     },
 

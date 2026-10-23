@@ -1072,3 +1072,34 @@ All messages are `window.postMessage` between Mission Control (parent) and the s
 | iframe → parent | `{type:'retry:state', state, layoutTag}` | after a human interacts with the shop directly (outside highlight mode) |
 
 Notes: `state` is the full `ShopState` (plus an optional `ui` field with product qty / coupon & payment messages / `payAttempts`, see `ShopStateX` in `lib/shop/engine.ts`). `lib/shop/solver.ts` exports `solveStep(task, state)` — the ideal rule-following action (handles every modal, layout and bug). `lib/shop/bugs.ts` exports `bugsAffecting(task, bugs)`: `coupon_500` only counts for coupon tasks (T2, T6, T8, T11), so suites should pair it with those.
+
+---
+
+## 29. Training, eval & demo interfaces (Agent D)
+
+**Refresh lifecycle** (`app/api/_lib/refresh.ts`, `GET /api/refresh/status?jobId`): `collecting → training → evaluating → promoted | held_back`.
+`evaluating` runs the 48-run held-out suite on the new version (plus the currently promoted version if it has no eval yet), one chunk per poll (whole suite per poll on mock). Response adds `eval: {done,total,evalId,baselineEvalId?}` while evaluating and `gate: {pass,reasons,headline,comparedTo}` once decided. Gate (§13.4) result + metrics are stored on `model_versions.metrics`; held-back versions get `heldBackReason` = `"HELD BACK — regression on bug detection (…)"`.
+
+**Eval** (`lib/eval/*`): `suite.ts` (`heldoutSuite()` 48 runs, seeds 9000–9047, 16 bug runs = 4 per bug, coupon_500 only on T2/T6/T8/T11; `assertDisjointPools()` training 1–200 / held-out 9000–9047 / judge ≥10000), `runner.ts` (`startEval`, `advanceEval`, `runEval`, `latestFinished`; concurrency `EVAL_CONCURRENCY`, chunk `EVAL_CHUNK`=8; runs persisted with `isEval`+`evalId`, run id `<evalId>_<idx>`), `metrics.ts` (`METRICS` = Mubit wording; `computeMetrics`), `gate.ts` (`gate(next, prev)`), `board.ts` (`heldoutBoard()` rows + learning curve + ICL curve, `ensureBaselines()`).
+- `POST /api/eval/run {versionId?|lane?, suite}` → `{evalId,total}`; `GET /api/eval/status?evalId` → `{evalId,lane,versionId,done,total,finished,partialMetrics}` (each poll advances a chunk).
+- `GET /api/metrics?scope=heldout` lazily evaluates GPT + Base v1 baselines when no eval exists; adds `icl` points.
+- Mock speed: `lib/mubit/mock.ts` gained an additive `withMockFast(fn)` (AsyncLocalStorage) — inside it the mock skips its sleep; reported `latencyMs` is unchanged. Eval/bootstrap use it, so 48 runs take well under a second.
+
+**Training data** (`lib/train/*`): `augment.ts` (`augmentCorrection(correction, step, ctx?)` → 8 rows `source:'augmented'`, `parentId`; pure `augmentExamples()`), `detect.ts` (pure `detectRescue(task,state,action,history)` — stuck points + correct action from the solver; used by backlog and Rescue queue), `backlog.ts` (scripted overnight backlog over training seeds, R1–R6 + BUG, never R7), `bootstrap.ts` (`ensureBootstrap()`).
+- Correction `source` values: `human` (a person), `scripted` (solver-generated backlog — never shown as human), `augmented`.
+- `POST|GET /api/demo/bootstrap` → `{ran, mode, ms, scripted, examples, byRule, versions[]}`. Idempotent (skips when scripted corrections exist), cached per server instance (Vercel lambdas each rebuild the same deterministic data in ~2–3 s on mock). On real Mubit it only creates corrections + feedback + baselines — no fabricated versions.
+- Lab APIs: `GET /api/lab` (versions, board, curve, icl, matrix columns), `GET /api/lab/run?runId` (step replay), `GET /api/lab/export` (JSONL), `POST /api/attract/run {seed≥10000, taskId, bugs, versionIndex}`.
+
+**Demo recording / replay** (`lib/demo/*`, client-safe):
+```ts
+import { loadRecording, createReplay, type Recording } from '@/lib/demo';
+const rec: Recording = await loadRecording();          // /demo/session-default.json
+const r = createReplay(rec, { onEvent: (e) => { /* drive lanes */ }, speed: 1, loop: false, onEnd });
+r.play(); r.pause(); r.stop(); r.position();
+```
+`Recording = { format:'retry-recording@1', id, title, recordedAt, source:'simulator'|'live', mubitMode, timing:'real'|'simulated', honestLabel, durationMs, events }` where each event has `at` (ms from start) and `kind`:
+`scene` (sceneId, title, caption, taskId, goal, seed, versionIndex, bugs, layoutTag, lanes[{lane,label,versionLabel}]) → reset each lane iframe (`retry:reset`);
+`step` (lane, runId, stepIdx, action, result, latencyMs, costUsd, promptChars, snapshot) → `retry:act` with the action (engine is deterministic);
+`verdict` (lane, runId, verdict, steps) → stamp; `correction` (lane, rule, source, badAction, goodAction, augmented) → card animation;
+`version` (phase, label, progress, examples?, headline?) → training ring / badge; `caption` (text).
+Always show `rec.honestLabel` in the ReplayBanner. Recorder for live sessions: `createRecorder({title, source:'live', mubitMode, timing:'real'})` → `add(event)` … `finish()`. Regenerate the default with `npm run record:demo`.
