@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 800">
+  <defs>
+    <radialGradient id="bg" cx="50%" cy="35%" r="75%"><stop offset="0" stop-color="#EAF0F1"/><stop offset="1" stop-color="#D3DEE0"/></radialGradient>
+    <linearGradient id="steel" x1="0" x2="1"><stop offset="0" stop-color="#2E5560"/><stop offset=".3" stop-color="#5E8E99"/><stop offset=".55" stop-color="#3F6E7A"/><stop offset="1" stop-color="#1F3E47"/></linearGradient>
+    <linearGradient id="cap" x1="0" x2="1"><stop offset="0" stop-color="#6E6E68"/><stop offset=".4" stop-color="#CFCFC6"/><stop offset="1" stop-color="#5D5D57"/></linearGradient>
+    <filter id="blur"><feGaussianBlur stdDeviation="14"/></filter>
+  </defs>
+  <rect width="800" height="800" fill="url(#bg)"/>
+  <ellipse cx="400" cy="690" rx="140" ry="20" fill="#1F3E47" opacity=".28" filter="url(#blur)"/>
+  <path d="M330 250 q0 -40 30 -50 h80 q30 10 30 50 l30 60 v340 q0 35 -35 35 h-150 q-35 0 -35 -35 v-340z" fill="url(#steel)"/>
+  <rect x="350" y="110" width="100" height="100" rx="18" fill="url(#cap)"/>
+  <path d="M370 110 q30 -40 60 0" stroke="#8A8A82" stroke-width="12" fill="none"/>
+  <path d="M300 430 q50 -25 100 0 t100 0 v40 q-50 -25 -100 0 t-100 0z" fill="#9FC6CC" opacity=".55"/>
+  <path d="M330 330 v300" stroke="#fff" stroke-width="16" opacity=".22" stroke-linecap="round"/>
+  <path d="M350 205 h100" stroke="#24444D" stroke-width="10"/>
+</svg>
