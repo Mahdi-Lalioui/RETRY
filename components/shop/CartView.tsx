@@ -12,9 +12,6 @@ function NewsletterBox() {
   if (!state.layout.modalsEnabled.includes('newsletter') || state.newsletterSubscribed) return null;
   return (
     <div className="relative overflow-hidden rounded-[14px] bg-[#E9EEE6] p-6 ring-1 ring-[#1F3D2B]/10">
-      <svg className="absolute -right-6 -top-8 opacity-[0.08]" width="140" height="140" viewBox="0 0 24 24" aria-hidden>
-        <path d="M15.5 2.6A9.6 9.6 0 1 0 21.4 15 7.6 7.6 0 0 1 15.5 2.6Z" fill="#1F3D2B" />
-      </svg>
       <div className="flex items-center gap-2 text-[#1F3D2B]"><Mail size={16} /><Eyebrow className="text-[#1F3D2B]">The Night Market list</Eyebrow></div>
       <p className="mt-2 text-[15px] font-medium tracking-[-0.01em] text-[#111]">Join the Night Market list for early access</p>
       <p className="mt-1 text-[12.5px] text-[#55554E]">New drops every other Thursday. No spam, unsubscribe anytime.</p>

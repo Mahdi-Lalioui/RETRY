@@ -1054,3 +1054,21 @@ export const repo: { runs, steps, corrections, versions, evals }  // insert/upda
 Mock model semantics (lib/mubit/mock.ts): `model` strings are `closed:<id>`, `open:<id>`; the mock reads the snapshot text in the last user message and returns JSON actions. Base/open v1 deliberately breaks rules R1–R7 at rule moments; an open model with a `versionId` follows every rule that has ≥1 correction in that version's training set (`repo.versions` / corrections with `versionId`), so lift is driven by real stored corrections, never hard-coded. Closed lane follows ~R5/R1 only half the time (seeded) and is slower/costlier.
 
 **Let's win this.**
+
+---
+
+## 28. Bridge protocol (`lib/shop/bridge.ts`, implemented by Agent A)
+
+All messages are `window.postMessage` between Mission Control (parent) and the shop iframe (`/shop/[seed]?lane&task&bugs=a,b&v=<versionIndex>`), same origin only (`event.origin === location.origin`). Coordinates are CSS px in the unscaled 1280×800 shop viewport; the parent multiplies by its frame scale.
+
+| Direction | Message | Reply / notes |
+|---|---|---|
+| parent → iframe | `{type:'retry:snapshot', reqId}` | `{type:'retry:snapshot:res', reqId, snapshot, ids, state, layoutTag}` — `ids` = element ids in the snapshot |
+| parent → iframe | `{type:'retry:act', reqId, action: AgentAction}` | during animation `{type:'retry:cursor', x, y, pressed?}` (move, then `pressed:true`, then `pressed:false` after apply); then `{type:'retry:act:res', reqId, result: StepResult, semKey?, state, layoutTag}`. Acts are queued (serial). `type` animates characters at 25ms; `scroll` scrolls 400px; `done`/`report_bug` return `ok` with no change. |
+| parent → iframe | `{type:'retry:highlight', enabled}` | rescue-hover mode: amber outline + chip `e3 · button · Not now`. Human clicks are NOT applied; iframe posts `{type:'retry:pick', id, semKey, role, label}` |
+| parent → iframe | `{type:'retry:apply', reqId, semKey, value?}` | applies a human-chosen action via `applyAction`; `{type:'retry:apply:res', reqId, result:'ok'\|'no_effect', state, layoutTag}` |
+| parent → iframe | `{type:'retry:reset', seed, versionIndex, bugs}` | rebuilds `initialState`; replies `{type:'retry:ready', layoutTag, state}` |
+| iframe → parent | `{type:'retry:ready', layoutTag, state}` | on mount and after reset |
+| iframe → parent | `{type:'retry:state', state, layoutTag}` | after a human interacts with the shop directly (outside highlight mode) |
+
+Notes: `state` is the full `ShopState` (plus an optional `ui` field with product qty / coupon & payment messages / `payAttempts`, see `ShopStateX` in `lib/shop/engine.ts`). `lib/shop/solver.ts` exports `solveStep(task, state)` — the ideal rule-following action (handles every modal, layout and bug). `lib/shop/bugs.ts` exports `bugsAffecting(task, bugs)`: `coupon_500` only counts for coupon tasks (T2, T6, T8, T11), so suites should pair it with those.

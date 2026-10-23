@@ -53,20 +53,23 @@ export function Home() {
   const { state } = useShop();
   return (
     <div>
-      <section className="mx-auto mt-6 grid max-w-[1180px] grid-cols-[1.05fr_1fr] gap-6 px-6">
+      <section className="mx-auto mt-6 grid h-[380px] max-w-[1180px] grid-cols-[1.05fr_1fr] gap-6 px-6">
         <div className="relative overflow-hidden rounded-[18px] bg-[#1F3D2B] px-12 py-11 text-[#F2EEE2]">
-          <svg className="absolute -right-16 -top-16 opacity-[0.12]" width="300" height="300" viewBox="0 0 24 24" aria-hidden>
-            <path d="M15.5 2.6A9.6 9.6 0 1 0 21.4 15 7.6 7.6 0 0 1 15.5 2.6Z" fill="#F2EEE2" />
+          <svg className="absolute right-8 top-8" width="190" height="150" viewBox="0 0 190 150" aria-hidden>
+            <path d="M138 18a40 40 0 1 0 34 58 32 32 0 0 1-34-58Z" fill="#F2EEE2" opacity=".9" />
+            {[[20, 30, 1.6], [64, 12, 1.1], [92, 54, 1.4], [40, 92, 1], [118, 118, 1.3], [170, 128, 1], [8, 132, 1.2]].map(([x, y, r]) => (
+              <circle key={`${x}-${y}`} cx={x} cy={y} r={r} fill="#F2EEE2" opacity=".55" />
+            ))}
           </svg>
           <Eyebrow className="text-[#BFD0C2]">Autumn edit · No. 07</Eyebrow>
           <h1 className="mt-4 max-w-[420px] text-[44px] font-medium leading-[1.04] tracking-[-0.035em]">Objects for slow evenings</h1>
           <p className="mt-4 max-w-[380px] text-[14.5px] leading-relaxed text-[#C9D5CB]">Small-batch homeware and apparel, made by independent studios and built to be used every day.</p>
           <div className="mt-7 inline-flex items-center gap-2 text-[13.5px] font-medium text-[#F2EEE2]">Shop the collection <ArrowRight size={15} /></div>
         </div>
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid min-h-0 grid-cols-2 gap-4">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/products/aurora-lamp.svg" alt="" className="h-full w-full rounded-[18px] object-cover" />
-          <div className="grid grid-rows-2 gap-4">
+          <div className="grid min-h-0 grid-rows-2 gap-4">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src="/products/orbit-clock.svg" alt="" className="h-full w-full rounded-[18px] object-cover" />
             {/* eslint-disable-next-line @next/next/no-img-element */}

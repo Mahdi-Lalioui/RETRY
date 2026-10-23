@@ -61,7 +61,7 @@ export function Modals() {
   return (
     <AnimatePresence>
       {top && (
-        <motion.div key="scrim" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.2 }}
+        <motion.div key="scrim" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0, pointerEvents: "none" }} transition={{ duration: 0.2 }}
           className={`absolute inset-0 z-40 ${top === 'cookies' ? 'bg-black/10' : 'grid place-items-center bg-[#111]/35 backdrop-blur-[3px]'}`}>
           <AnimatePresence mode="wait">
             {top === 'cookies' && <CookieSheet key="cookies" />}
