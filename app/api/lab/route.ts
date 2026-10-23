@@ -37,6 +37,8 @@ export async function GET(req: Request) {
         }),
       });
     }
+    const rank = (c: MatrixColumn) => (c.lane === 'closed' ? 0 : c.lane === 'icl' ? 2 : 1);
+    columns.sort((a, b) => rank(a) - rank(b) || a.examples - b.examples);
     const corrections = await repo.corrections.list();
     return ok({
       mode: mubitMode(), db: repo.kind,

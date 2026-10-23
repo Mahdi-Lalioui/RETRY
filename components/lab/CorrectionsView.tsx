@@ -26,7 +26,7 @@ export function CorrectionsView() {
   const load = useCallback(async () => {
     await fetch('/api/demo/bootstrap', { method: 'POST' }).catch(() => null);
     const j = await (await fetch('/api/corrections?limit=1000', { cache: 'no-store' })).json();
-    if (j.ok) setRows(j.data);
+    if (j.ok) setRows(groupByParent(j.data as Row[]));
   }, []);
   useEffect(() => { void load(); }, [load]);
   useEffect(() => { if (new URLSearchParams(window.location.search).get('mode') === 'queue') setMode('queue'); }, []);
@@ -110,6 +110,17 @@ export function CorrectionsView() {
       <PairDrawer row={open} parent={open?.parentId ? byId.get(open.parentId) ?? null : null} siblings={open ? (rows ?? []).filter((r) => r.parentId === (open.parentId ?? open.id)).length : 0} onClose={() => setOpen(null)} onOpen={setOpen} />
     </main>
   );
+}
+
+/** Newest rescue first, each followed by its augmented copies. */
+function groupByParent(rows: Row[]): Row[] {
+  const kids = new Map<string, Row[]>();
+  const roots: Row[] = [];
+  for (const r of rows) {
+    if (r.parentId && rows.some((x) => x.id === r.parentId)) kids.set(r.parentId, [...(kids.get(r.parentId) ?? []), r]);
+    else roots.push(r);
+  }
+  return roots.flatMap((r) => [r, ...(kids.get(r.id) ?? [])]);
 }
 
 function Filter({ label, values, value, onChange }: { label: string; values: string[]; value: string | null; onChange: (v: string | null) => void }) {
