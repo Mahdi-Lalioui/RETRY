@@ -58,7 +58,7 @@ export function ControlDeck() {
           <AnimatePresence>
             {breakMenu && (
               <motion.div initial={{ opacity: 0, y: 8, scale: 0.97 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 8, scale: 0.97 }}
-                className="glass absolute bottom-[calc(100%+10px)] left-0 w-[230px] rounded-[12px] p-1">
+                className="absolute bottom-[calc(100%+10px)] left-0 w-[240px] rounded-[12px] border border-white/10 bg-[#12161E]/98 p-1 shadow-[0_20px_60px_-10px_#000]">
                 {BUGS.map((b, i) => (
                   <button key={b.id} onClick={() => breakCheckout(b.id)}
                     className="flex w-full items-center gap-2 rounded-[8px] px-2 py-1.5 text-left hover:bg-white/[0.07]">

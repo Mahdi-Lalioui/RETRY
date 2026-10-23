@@ -22,7 +22,7 @@ export function CorrectionCard({ c, className, compact }: { c: CorrectionView; c
       <div className="flex items-center gap-1.5">
         <span className="truncate rounded-[5px] border border-rescue/40 bg-rescue/10 px-1.5 font-mono text-[10.5px] text-[#FCD34D]">{ruleLabel}</span>
         <span className="shrink-0 rounded-[5px] border border-white/10 px-1.5 font-mono text-[10px] text-white/60">human</span>
-        <span className="shrink-0 rounded-[5px] border border-white/10 px-1.5 font-mono text-[10px] text-white/60">×{c.augmented} augmented</span>
+        {(c.augmented > 0 || c.status === 'queued') && <span className="shrink-0 rounded-[5px] border border-white/10 px-1.5 font-mono text-[10px] text-white/60">×{c.augmented} augmented</span>}
       </div>
       <div className={cn('mt-1.5 font-mono text-[11px] leading-[16px]', compact && 'mt-1')}>
         <div className="truncate text-fail/90 line-through decoration-fail/60">- {describeAction(c.bad.action, c.bad.label)}</div>

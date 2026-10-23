@@ -50,7 +50,11 @@ export function LaneHeader({ lane }: { lane: LaneId }) {
         </span>
       </div>
       <div className="mt-1 flex h-[18px] items-center gap-2 overflow-hidden font-mono text-[11.5px] 2xl:text-[12.5px]">
-        {l.thinking ? (
+        {l.rescueQueued ? (
+          <span className="flex items-center gap-1.5 font-sans text-[11.5px] text-rescue">
+            <span className="h-1.5 w-1.5 animate-pulse-slow rounded-full bg-rescue" /> stuck · queued for a human rescue
+          </span>
+        ) : l.thinking ? (
           <span className="flex items-center gap-1.5 text-muted">
             <span className="inline-flex gap-[3px]">{[0, 1, 2].map((i) => <span key={i} className="h-1 w-1 rounded-full animate-pulse-slow" style={{ background: t.hex, animationDelay: `${i * 0.2}s` }} />)}</span>
             deciding via Mubit…

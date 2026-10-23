@@ -6,6 +6,7 @@ import type { BugId, RuleId, ShopState } from '@/lib/shop/state';
 import { LANES } from '@/lib/agent/lanes';
 import { detectStuck } from '@/lib/agent/stuck';
 import { getTask, TASKS } from '@/lib/shop/tasks';
+import { bugsAffecting } from '@/lib/shop/bugs';
 import { api, apiSafe } from '@/lib/store/api';
 import { bridge, waitReady, type Pick } from '@/lib/store/frames';
 import { emit } from '@/lib/store/bus';
@@ -17,6 +18,7 @@ const S = () => useMission.getState();
 const controllers = new Map<LaneId, AbortController>();
 const rescueWaiters = new Map<LaneId, (r: RescueResult | null) => void>();
 const usedSeeds = new Set<number>();
+let rescueChain: Promise<void> = Promise.resolve();
 
 export interface RescueResult { pick: Pick; value?: string; rule?: RuleId | 'other'; ruleText?: string }
 
@@ -51,7 +53,8 @@ function modelRefFor(lane: LaneId) {
 
 async function finish(runId: string, lane: LaneId, taskId: string, finalAction: AgentAction | null, state: ShopState | null, fallback: Verdict): Promise<Verdict> {
   try {
-    return await api<Verdict>('/api/agent/finish', { runId, lane, taskId, finalAction, state, stuck: finalAction === null });
+    if (!state) return fallback;
+    return await api<Verdict>('/api/agent/finish', { runId, lane, taskId, finalAction, finalState: state, stuck: finalAction === null });
   } catch { return fallback; }
 }
 
@@ -79,6 +82,7 @@ async function runLane(lane: LaneId, sig: AbortSignal) {
       const res = await api<StepResponse>('/api/agent/step', {
         runId, lane, taskId: task.id, goal: task.goal, snapshot: snap.snapshot,
         history: history.slice(-6), modelRef: modelRefFor(lane), stepIdx,
+        state, seed: S().seed, bugs: S().bugs,
       }, sig);
       check(sig);
       emit('call', { lane, ms: res.latencyMs });
@@ -123,7 +127,13 @@ async function runLane(lane: LaneId, sig: AbortSignal) {
           stamp(lane, await finish(runId, lane, task.id, null, state, { status: newRule ? 'violation' : 'stuck', correct: false, reason: newRule ? `Broke house rule ${newRule}` : 'Agent got stuck', violations: state.violations }));
           return;
         }
-        // Live: ask a human.
+        // Live: ask a human. One rescue at a time — other stuck lanes queue behind it.
+        const prevRescue = rescueChain;
+        let release: () => void = () => {};
+        rescueChain = new Promise<void>((r) => { release = r; });
+        S().patchLane(lane, { rescueQueued: true });
+        try { await Promise.race([prevRescue, new Promise((r) => sig.addEventListener('abort', r, { once: true }))]); } finally { S().patchLane(lane, { rescueQueued: false }); }
+        if (sig.aborted) { release(); throw new Aborted(); }
         S().patchLane(lane, { status: 'rescue' });
         S().set({ rescue: { lane, stepId: res.stepId, badAction: res.action, badLabel: entry.label, autoRule: newRule, rule: newRule, otherText: '', value: '' } });
         bridge.highlight(lane, true);
@@ -132,6 +142,7 @@ async function runLane(lane: LaneId, sig: AbortSignal) {
           sig.addEventListener('abort', () => resolve(null), { once: true });
         });
         rescueWaiters.delete(lane);
+        release();
         bridge.highlight(lane, false);
         if (S().rescue?.lane === lane) S().set({ rescue: null });
         check(sig);
@@ -167,9 +178,11 @@ async function submitCorrection(lane: LaneId, stepId: string, bad: AgentAction, 
   };
   S().set({ corrections: [view, ...S().corrections].slice(0, 12) });
   emit('card', { id, lane });
-  const rule = r.rule === 'other' ? (r.ruleText ? `other:${r.ruleText}` : undefined) : r.rule;
+  const isBug = good.type === 'report_bug';
+  const rule = r.rule === 'other' ? 'Other' : r.rule ?? (isBug ? 'BUG' : undefined);
+  const note = r.rule === 'other' && r.ruleText ? r.ruleText : undefined;
   try {
-    const out = await api<{ correctionId: string; augmented: number | unknown[] }>('/api/corrections', { stepId, goodAction: good, rule });
+    const out = await api<{ correctionId: string; augmented: number | unknown[]; semKey?: string | null }>('/api/corrections', { stepId, goodAction: good, rule, note });
     const aug = Array.isArray(out.augmented) ? out.augmented.length : Number(out.augmented) || 0;
     patchCorrection(id, { status: 'sent', augmented: aug });
     const c = S().counts;
@@ -196,6 +209,7 @@ export function stopAll() {
   controllers.forEach((c) => c.abort());
   controllers.clear();
   rescueWaiters.forEach((w) => w(null));
+  rescueChain = Promise.resolve();
   S().activeLanes().forEach((l) => bridge.highlight(l, false));
   S().set({ running: false, rescue: null });
 }
@@ -241,7 +255,10 @@ export function shipNewVersion() {
 
 export function breakCheckout(bug: BugId) {
   stopAll();
-  S().set({ bugs: [bug], breakMenu: false });
+  // coupon_500 only manifests on coupon tasks (lib/shop/bugs.bugsAffecting) — switch to one if needed.
+  const task = getTask(S().taskId);
+  const taskId = bugsAffecting(task, [bug]).length ? task.id : (TASKS.find((t) => t.wantsCoupon)?.id ?? task.id);
+  S().set({ bugs: [bug], breakMenu: false, taskId });
   S().resetLanes();
   resetFrames();
 }
@@ -264,7 +281,8 @@ export async function judgesTurn() {
   const task = TASKS[Math.floor(Math.random() * TASKS.length)];
   const bugs: BugId[] = ['pay_button_dead', 'total_nan', 'no_order_id', 'coupon_500'];
   stopAll();
-  S().set({ seed: nextUnseenSeed(), taskId: task.id, bugs: Math.random() < 0.3 ? [bugs[Math.floor(Math.random() * 4)]] : [] });
+  const pool = bugsAffecting(task, bugs);
+  S().set({ seed: nextUnseenSeed(), taskId: task.id, bugs: Math.random() < 0.3 ? [pool[Math.floor(Math.random() * pool.length)]] : [] });
   await runAll();
 }
 
@@ -276,12 +294,15 @@ export function toggleIcl() {
 
 export function toggleDemo() {
   const s = S();
-  s.set({ mode: s.mode === 'live' ? 'replay' : 'live', replayAt: new Date().toLocaleString('en-GB', { weekday: 'short', hour: '2-digit', minute: '2-digit' }) });
+  const next = s.mode === 'live' ? 'replay' : 'live';
+  if (next === 'replay') stopAll();
+  s.set({ mode: next, replayAt: s.replayAt ?? new Date().toLocaleString('en-GB', { weekday: 'short', hour: '2-digit', minute: '2-digit' }) });
+  if (next === 'replay') void replayProvider?.();
 }
 
 // ───────────────────────── Training / versions ─────────────────────────
 
-interface StatusRes { phase: 'collecting' | 'training' | 'evaluating' | 'promoted' | 'held_back'; progress?: number; version?: { versionId: string; label: string; examples?: number; createdAt?: string }; reason?: string }
+interface StatusRes { phase: 'collecting' | 'training' | 'evaluating' | 'promoted' | 'held_back'; progress?: number; version?: VersionLike; reason?: string; queued?: number; needed?: number }
 let polling = false;
 
 export async function trainNow() {
@@ -301,7 +322,7 @@ export async function trainNow() {
       if (st.phase === 'training' || st.phase === 'collecting') S().set({ training: { ...S().training, phase: 'training', progress: st.progress ?? Math.min(0.95, (Date.now() - startedAt) / 120000) } });
       else if (st.phase === 'evaluating') S().set({ training: { ...S().training, phase: 'evaluating', progress: st.progress ?? 0.5 } });
       else if (st.phase === 'held_back') {
-        S().set({ training: { ...S().training, phase: 'held_back', progress: 1, reason: st.reason ?? 'regression on bug detection' } });
+        S().set({ training: { ...S().training, phase: 'held_back', progress: 1, reason: st.reason ?? st.version?.heldBackReason ?? 'regression on bug detection' } });
         break;
       } else if (st.phase === 'promoted') {
         const secs = Math.round((Date.now() - startedAt) / 1000);
@@ -314,7 +335,7 @@ export async function trainNow() {
 }
 
 async function promote(v: StatusRes['version'], trainSeconds: number) {
-  let next = v;
+  let next: { versionId?: string; label: string; examples?: number; createdAt?: string } | null | undefined = v ? toAdapted(v) : undefined;
   if (!next) {
     const list = await apiSafe<VersionLike[]>('/api/versions');
     const pick = list ? latestPromoted(list) : null;
@@ -339,11 +360,14 @@ interface CorrectionRow {
   id?: string; source?: string; versionId?: string | null; rule?: string | null; status?: string; lane?: string;
   badAction?: unknown; goodAction?: unknown; badLabel?: string; goodLabel?: string;
 }
-interface VersionLike { versionId?: string; id?: string; label: string; createdAt?: string; examples?: number; status?: string; promoted?: boolean }
+interface VersionLike { versionId?: string; id?: string; label: string; createdAt?: string | Date; examples?: number | null; status?: string; promoted?: boolean | null; heldBackReason?: string | null }
+function toAdapted(v: VersionLike) {
+  return { versionId: v.versionId ?? v.id ?? v.label, label: v.label, examples: v.examples ?? undefined, createdAt: v.createdAt ? String(v.createdAt) : undefined };
+}
 function latestPromoted(list: VersionLike[]) {
   const ok = list.filter((v) => v.promoted !== false && (v.status === undefined || v.status === 'ready'));
   const v = ok[ok.length - 1];
-  return v ? { versionId: v.versionId ?? v.id ?? v.label, label: v.label, examples: v.examples, createdAt: v.createdAt } : null;
+  return v ? toAdapted(v) : null;
 }
 
 // ───────────────────────── Data loading ─────────────────────────
@@ -351,12 +375,21 @@ function latestPromoted(list: VersionLike[]) {
 export async function loadMetrics(scope: Scope = S().scope) {
   const raw = await apiSafe<unknown>(`/api/metrics?scope=${scope}`);
   if (!raw) return;
-  const obj: { rows?: ScoreRow[]; curve?: CurvePoint[]; calls?: number } = Array.isArray(raw) ? { rows: raw as ScoreRow[] } : (raw as { rows?: ScoreRow[]; curve?: CurvePoint[]; calls?: number });
-  const rows = (obj.rows ?? []).filter((r): r is ScoreRow => !!r && typeof r === 'object' && 'label' in r && 'values' in r);
-  S().set({ rows, curve: obj.curve ?? S().curve, metricsKey: S().metricsKey + 1, ...(obj.calls && obj.calls > S().calls ? { calls: obj.calls } : {}) });
+  const obj = (Array.isArray(raw) ? { rows: raw } : raw) as { rows?: unknown[]; curve?: unknown[]; calls?: number; totals?: Totals };
+  const { rows, curve } = normalizeMetrics(obj.rows ?? [], obj.curve ?? [], S().adapted.versionId);
+  const patch: Partial<ReturnType<typeof S>> = { rows, metricsKey: S().metricsKey + 1 };
+  if (curve.length) patch.curve = curve;
+  if (obj.calls && obj.calls > S().calls) patch.calls = obj.calls;
+  if (obj.totals) {
+    patch.counts = { rescues: obj.totals.rescues, examples: obj.totals.examples, sinceVersion: obj.totals.sinceCurrent };
+    if (S().training.phase === 'collecting' && obj.totals.sinceCurrent >= REFRESH_MIN_EXAMPLES) patch.training = { ...S().training, phase: 'ready' };
+  }
+  S().set(patch);
 }
 
 export async function boot() {
+  // Agent D: seeds demo data when the DB is empty. Missing route -> ignored.
+  await apiSafe('/api/demo/bootstrap', {});
   const [health, versions, corrections] = await Promise.all([
     apiSafe<{ mubit: 'ok' | 'mock' | 'down'; db: string; demoMode: boolean }>('/api/health'),
     apiSafe<VersionLike[]>('/api/versions'),
@@ -390,3 +423,62 @@ export async function boot() {
   }
   await loadMetrics();
 }
+
+interface Totals { rescues: number; examples: number; sinceCurrent: number; currentVersion?: string }
+interface LaneRow {
+  lane: string; versionId: string | null; runs?: number; verifiedSuccess: number | null; bugRecall: number | null; falseAlarms: number | null;
+  violationsPerRun: number | null; rescuesPer10: number | null; p50LatencyMs: number | null; costPerRunUsd: number | null; promptChars: number | null;
+}
+const METRICS: { key: keyof LaneRow; label: string; unit?: string; better: 'higher' | 'lower'; pct?: boolean }[] = [
+  { key: 'verifiedSuccess', label: 'Verified success', unit: '%', better: 'higher', pct: true },
+  { key: 'bugRecall', label: 'Bug recall', unit: '%', better: 'higher', pct: true },
+  { key: 'falseAlarms', label: 'False alarms', better: 'lower' },
+  { key: 'violationsPerRun', label: 'Policy violations / run', better: 'lower' },
+  { key: 'rescuesPer10', label: 'Rescues / 10 runs', better: 'lower' },
+  { key: 'p50LatencyMs', label: 'p50 latency / step', unit: 'ms', better: 'lower' },
+  { key: 'costPerRunUsd', label: 'Cost / run', unit: '$', better: 'lower' },
+  { key: 'promptChars', label: 'Prompt size', unit: 'chars', better: 'lower' },
+];
+
+/** Accepts per-metric ScoreRow[] (already pivoted) or per-lane rows from lib/db/queries (pivots them). */
+export function normalizeMetrics(rawRows: unknown[], rawCurve: unknown[], adaptedVersionId?: string): { rows: ScoreRow[]; curve: CurvePoint[] } {
+  const isPivoted = rawRows.length > 0 && rawRows.every((r) => !!r && typeof r === 'object' && 'values' in r && 'label' in r);
+  let rows: ScoreRow[] = [];
+  if (isPivoted) rows = rawRows as ScoreRow[];
+  else {
+    const lr = rawRows.filter((r): r is LaneRow => !!r && typeof r === 'object' && 'lane' in r);
+    const pick = (lane: string): { cur?: LaneRow; prev?: LaneRow } => {
+      const xs = lr.filter((r) => r.lane === lane && (r.runs ?? 1) > 0);
+      if (lane !== 'adapted' || xs.length <= 1) return { cur: xs[0] };
+      const i = Math.max(0, xs.findIndex((r) => r.versionId === adaptedVersionId));
+      return { cur: xs[i], prev: xs[i + 1] }; // newest first
+    };
+    const lanes: LaneId[] = ['closed', 'base', 'adapted', 'icl'];
+    const per = Object.fromEntries(lanes.map((l) => [l, pick(l)])) as Record<LaneId, { cur?: LaneRow; prev?: LaneRow }>;
+    const val = (r: LaneRow | undefined, m: (typeof METRICS)[number]) => {
+      const v = r?.[m.key];
+      return typeof v === 'number' ? (m.pct ? v * 100 : v) : null;
+    };
+    if (lr.length) rows = METRICS.map((m) => ({
+      key: m.key, label: m.label, unit: m.unit, better: m.better,
+      values: Object.fromEntries(lanes.map((l) => [l, val(per[l].cur, m)])),
+      prev: per.adapted.prev ? { adapted: val(per.adapted.prev, m) } : undefined,
+    }));
+  }
+  const curve: CurvePoint[] = [];
+  for (const c of rawCurve) {
+    if (!c || typeof c !== 'object') continue;
+    const o = c as { lane?: string; label?: string; version?: string; corrections?: number; verifiedSuccess?: number | null; success?: number };
+    const success = typeof o.success === 'number' ? o.success : typeof o.verifiedSuccess === 'number' ? o.verifiedSuccess * 100 : null;
+    if (success === null) continue;
+    curve.push({ lane: (o.lane ?? 'adapted') as LaneId, version: o.version ?? o.label ?? '', corrections: o.corrections ?? 0, success });
+  }
+  return { rows, curve };
+}
+
+// ───────────────────────── Hook points for Agent D ─────────────────────────
+/** DEMO_MODE replay provider (lib/demo loadRecording). When registered, toggling D into replay calls it. */
+type ReplayProvider = () => Promise<void> | void;
+let replayProvider: ReplayProvider | null = null;
+export function setReplayProvider(p: ReplayProvider | null) { replayProvider = p; }
+export function getReplayProvider() { return replayProvider; }

@@ -33,9 +33,10 @@ export function Hotkeys() {
       const a = document.activeElement;
       if (a && a.tagName === 'IFRAME') (a as HTMLElement).blur();
     }, 0);
+    const poll = setInterval(onBlur, 400);
     window.addEventListener('keydown', onKey);
     window.addEventListener('blur', onBlur);
-    return () => { window.removeEventListener('keydown', onKey); window.removeEventListener('blur', onBlur); };
+    return () => { clearInterval(poll); window.removeEventListener('keydown', onKey); window.removeEventListener('blur', onBlur); };
   }, []);
   return null;
 }

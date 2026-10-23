@@ -39,9 +39,9 @@ export function ShopFrame({ lane, children }: { lane: LaneId; children?: React.R
   }, []);
 
   return (
-    <div ref={box} className="relative min-h-0 flex-1">
+    <div ref={box} className="relative min-h-0 flex-1 overflow-clip">
       <div
-        className="absolute overflow-hidden rounded-[8px] bg-[#FAFAF7] shadow-[0_0_0_1px_#ffffff14,0_12px_40px_-12px_#000]"
+        className="absolute overflow-clip rounded-[8px] bg-[#FAFAF7] shadow-[0_0_0_1px_#ffffff14,0_12px_40px_-12px_#000]"
         style={{ left: g.ox, top: g.oy, width: g.w, height: g.h, opacity: g.scale ? 1 : 0 }}
         data-lane-frame={lane}
       >

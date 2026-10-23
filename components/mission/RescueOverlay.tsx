@@ -43,7 +43,7 @@ export function RescueOverlay({ lane }: { lane: LaneId }) {
         resolveRescue(lane, { pick: cur.picked, value: cur.value, rule: cur.rule, ruleText: cur.otherText });
         return;
       }
-      if (typing) return;
+      if (typing || useMission.getState().breakMenu) return;
       if (/^[1-7]$/.test(e.key)) { e.stopImmediatePropagation(); patch({ rule: `R${e.key}` as RuleId }); }
       if (e.key === '0' || e.key.toLowerCase() === 'o') { e.stopImmediatePropagation(); patch({ rule: 'other' }); }
     };
@@ -55,7 +55,7 @@ export function RescueOverlay({ lane }: { lane: LaneId }) {
   return (
     <AnimatePresence>
       {rescue && (
-        <motion.div key="rescue" className="pointer-events-none absolute inset-0 z-40" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+        <motion.div key="rescue" data-rescue-lane={lane} className="pointer-events-none absolute inset-0 z-40" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
           {/* dim + amber pulse border */}
           <div className="absolute inset-0 rounded-[8px] bg-black/40 rescue-pulse" />
           {/* banner */}

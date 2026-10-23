@@ -19,7 +19,7 @@ export interface BugReport { evidence: string; page: string; layoutTag: string; 
 export interface LaneRuntime {
   status: LaneStatus; runId?: string; steps: StepEntry[]; thinking: boolean;
   verdict?: Verdict; verdictKey: number; latencies: number[]; costUsd: number; costKnown: boolean;
-  promptChars: number; layoutTag?: string; bug?: BugReport; flash?: RuleId | null; error?: string;
+  promptChars: number; layoutTag?: string; bug?: BugReport; flash?: RuleId | null; error?: string; rescueQueued?: boolean;
 }
 export interface RescueState {
   lane: LaneId; stepId: string; badAction: AgentAction; badLabel?: string; autoRule?: RuleId;
@@ -91,3 +91,6 @@ export function p50(xs: number[]): number | null {
   const s = [...xs].sort((a, b) => a - b);
   return s[Math.floor((s.length - 1) / 2)];
 }
+
+// Debug/automation handle (screenshot scripts, /attract): window.__mission.getState()
+if (typeof window !== "undefined") (window as unknown as { __mission?: typeof useMission }).__mission = useMission;

@@ -20,7 +20,7 @@ export function MissionControl() {
   const lanes: LaneId[] = iclOn ? ['closed', 'base', 'adapted', 'icl'] : ['closed', 'base', 'adapted'];
   useEffect(() => { void boot(); }, []);
   return (
-    <main className="relative flex h-dvh w-screen flex-col overflow-hidden">
+    <main className="relative flex h-dvh w-screen flex-col overflow-clip">
       <TopBar />
       <ReplayBanner />
       <div className="flex min-h-0 flex-1 flex-col px-4 2xl:px-6">
