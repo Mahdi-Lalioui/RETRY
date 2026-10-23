@@ -7,6 +7,7 @@ export type BoardRow = FinalEvalMetrics & { evalId: string; label: string };
 export interface CurvePoint {
   versionId: string; label: string; corrections: number; verifiedSuccess: number | null; bugRecall: number | null;
   lane: string; status: 'promoted' | 'held_back' | 'current' | 'evaluated'; evalId: string;
+  promptChars: number | null; p50LatencyMs: number | null; costPerRunUsd: number | null; falseAlarms: number;
 }
 export interface IclPoint { corrections: number; verifiedSuccess: number | null; p50LatencyMs: number | null; promptChars: number | null; costPerRunUsd: number | null; evalId: string }
 
@@ -40,7 +41,7 @@ export async function heldoutBoard(): Promise<{ rows: BoardRow[]; curve: CurvePo
     const gate = (v.metrics as { gate?: { pass: boolean } } | null)?.gate;
     curve.push({
       versionId: v.id, label: v.label, corrections: v.examples ?? 0, verifiedSuccess: m.verifiedSuccess, bugRecall: m.bugRecall,
-      lane: e.lane ?? 'adapted', evalId: e.id,
+      lane: e.lane ?? 'adapted', evalId: e.id, promptChars: m.promptChars, p50LatencyMs: m.p50LatencyMs, costPerRunUsd: m.costPerRunUsd, falseAlarms: m.falseAlarms,
       status: v.id === current?.id ? 'current' : v.heldBackReason || gate?.pass === false ? 'held_back' : gate?.pass ? 'promoted' : 'evaluated',
     });
   }

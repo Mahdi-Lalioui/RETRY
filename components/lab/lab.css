@@ -1,0 +1,74 @@
+/* Agent D pages (/lab, /corrections, /attract). Reads Mission Control tokens (§14.1) from app/globals.css when present,
+   with the plan's values as fallbacks, via private --rx-* aliases. */
+.rx {
+  --rx-bg: var(--bg, #07080B);
+  --rx-grid: var(--grid, #11141A);
+  --rx-panel: var(--panel, #0D1016);
+  --rx-panel-2: var(--panel-2, #12161E);
+  --rx-border: var(--border, #1C222C);
+  --rx-text: var(--text, #E8EDF5);
+  --rx-muted: var(--muted, #7A8597);
+  --rx-faint: var(--faint, #3A4352);
+  --rx-mubit: var(--mubit, #FF4500);
+  --rx-learn: var(--learn, #22D3EE);
+  --rx-base: var(--base, #A78BFA);
+  --rx-closed: var(--closed, #94A3B8);
+  --rx-icl: var(--icl, #F472B6);
+  --rx-pass: var(--pass, #34D399);
+  --rx-fail: var(--fail, #F43F5E);
+  --rx-rescue: var(--rescue, #F59E0B);
+  --rx-radius: var(--radius, 12px);
+  min-height: 100vh;
+  background-color: var(--rx-bg);
+  background-image: linear-gradient(var(--rx-grid) 1px, transparent 1px), linear-gradient(90deg, var(--rx-grid) 1px, transparent 1px);
+  background-size: 32px 32px;
+  color: var(--rx-text);
+  font-family: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  font-size: 14px;
+  -webkit-font-smoothing: antialiased;
+}
+.rx::after {
+  content: ''; position: fixed; inset: 0; pointer-events: none; z-index: 0;
+  background: radial-gradient(ellipse at center, transparent 55%, rgba(0, 0, 0, .55));
+}
+.rx > * { position: relative; z-index: 1; }
+.rx .mono { font-family: var(--font-geist-mono), ui-monospace, SFMono-Regular, Menlo, monospace; }
+.rx .num { font-variant-numeric: tabular-nums; font-family: var(--font-geist-mono), ui-monospace, monospace; }
+.rx .panel {
+  background: var(--rx-panel); border: 1px solid var(--rx-border); border-radius: var(--rx-radius);
+  box-shadow: inset 0 1px 0 #ffffff08, 0 20px 60px -30px #000;
+}
+.rx .panel-2 { background: var(--rx-panel-2); border: 1px solid var(--rx-border); border-radius: 10px; }
+.rx .hairline { border-color: var(--rx-border); }
+.rx .muted { color: var(--rx-muted); }
+.rx .faint { color: var(--rx-faint); }
+.rx ::selection { background: #22D3EE44; }
+.rx .scroll-thin::-webkit-scrollbar { width: 8px; height: 8px; }
+.rx .scroll-thin::-webkit-scrollbar-thumb { background: var(--rx-border); border-radius: 8px; }
+.rx .scroll-thin::-webkit-scrollbar-track { background: transparent; }
+.rx .btn {
+  display: inline-flex; align-items: center; gap: 8px; height: 32px; padding: 0 12px; border-radius: 8px;
+  border: 1px solid var(--rx-border); background: var(--rx-panel-2); color: var(--rx-text); font-size: 13px; font-weight: 500;
+  transition: border-color .15s, background .15s, color .15s;
+}
+.rx .btn:hover:not(:disabled) { border-color: #2C3542; background: #161B25; }
+.rx .btn:disabled { opacity: .45; cursor: not-allowed; }
+.rx .btn-learn { border-color: #22D3EE55; color: #A5F3FC; background: #22D3EE14; }
+.rx .btn-learn:hover:not(:disabled) { border-color: #22D3EE; background: #22D3EE22; }
+.rx .btn-amber { border-color: #F59E0B66; color: #FCD34D; background: #F59E0B14; }
+.rx .btn-amber:hover:not(:disabled) { border-color: #F59E0B; background: #F59E0B24; }
+.rx .input {
+  height: 32px; padding: 0 10px; border-radius: 8px; border: 1px solid var(--rx-border); background: #0A0D12;
+  color: var(--rx-text); font-size: 13px; outline: none;
+}
+.rx .input:focus { border-color: #22D3EE88; box-shadow: 0 0 0 3px #22D3EE1A; }
+.rx kbd {
+  font-family: var(--font-geist-mono), monospace; font-size: 11px; padding: 1px 6px; border-radius: 5px;
+  border: 1px solid #ffffff1a; background: #ffffff0d; color: var(--rx-muted);
+}
+@keyframes rx-pulse { 0%, 100% { opacity: 1 } 50% { opacity: .35 } }
+.rx .pulse { animation: rx-pulse 1.4s ease-in-out infinite; }
+@keyframes rx-sweep { from { transform: translateX(-100%) } to { transform: translateX(100%) } }
+.rx .sweep { position: relative; overflow: hidden; }
+.rx .sweep::after { content: ''; position: absolute; inset: 0; background: linear-gradient(90deg, transparent, #22D3EE22, transparent); animation: rx-sweep 1.6s linear infinite; }
+@media (prefers-reduced-motion: reduce) { .rx .pulse, .rx .sweep::after { animation: none; } }
