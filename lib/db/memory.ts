@@ -1,7 +1,7 @@
 // In-memory repo with the IDENTICAL API to the Neon repo (plan §17). Used when DATABASE_URL is missing.
 import { nanoid } from 'nanoid';
 import type {
-  Repo, Run, NewRun, Step, NewStep, Correction, NewCorrection, ModelVersion, NewModelVersion, Eval, NewEval, Table,
+  Repo, WithOptionalId, Run, NewRun, Step, NewStep, Correction, NewCorrection, ModelVersion, NewModelVersion, Eval, NewEval, Table,
 } from './schema';
 
 export function seedVersion(): NewModelVersion {
@@ -13,28 +13,28 @@ export function seedVersion(): NewModelVersion {
 
 const ts = (d: Date | null | undefined) => (d ? d.getTime() : 0);
 
-export function fillRun(r: NewRun): Run {
+export function fillRun(r: WithOptionalId<NewRun>): Run {
   return { versionId: null, correct: null, reason: null, violations: null, steps: 0, costUsd: null, latencyP50: null, promptChars: null, isEval: false,
     evalId: null, startedAt: new Date(), endedAt: null, ...r, id: r.id ?? `run_${nanoid(10)}` } as Run;
 }
-export function fillStep(r: NewStep): Step {
+export function fillStep(r: WithOptionalId<NewStep>): Step {
   return { raw: null, result: null, callId: null, latencyMs: null, tokensIn: null, tokensOut: null, costUsd: null,
     promptChars: null, state: null, ...r, id: r.id ?? `step_${nanoid(10)}` } as Step;
 }
-export function fillCorrection(r: NewCorrection): Correction {
+export function fillCorrection(r: WithOptionalId<NewCorrection>): Correction {
   return { stepId: null, runId: null, parentId: null, rule: null, badAction: null, semKey: null, seed: null,
     mubitFeedbackId: null, versionId: null, lane: null, createdAt: new Date(), ...r, id: r.id ?? `cor_${nanoid(10)}` } as Correction;
 }
-export function fillVersion(r: NewModelVersion): ModelVersion {
+export function fillVersion(r: WithOptionalId<NewModelVersion>): ModelVersion {
   return { mubitVersionId: null, examples: 0, promoted: false, heldBackReason: null, createdAt: new Date(), readyAt: null,
     metrics: null, rules: [], jobId: null, ...r, id: r.id ?? `ver_${nanoid(8)}` } as ModelVersion;
 }
-export function fillEval(r: NewEval): Eval {
+export function fillEval(r: WithOptionalId<NewEval>): Eval {
   return { versionId: null, lane: null, total: 0, done: 0, metrics: null, createdAt: new Date(), ...r, id: r.id ?? `eval_${nanoid(8)}` } as Eval;
 }
 
 function table<T extends { id: string }, N, F>(
-  fill: (n: N) => T,
+  fill: (n: WithOptionalId<N>) => T,
   match: (row: T, f: F) => boolean,
   order: (a: T, b: T) => number,
   limitOf: (f: F) => number | undefined,

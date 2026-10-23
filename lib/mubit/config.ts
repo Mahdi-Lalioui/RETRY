@@ -33,7 +33,7 @@ export interface MubitConfig {
   refreshMinExamples: number;
 }
 
-export function readConfig(env: NodeJS.ProcessEnv = process.env): MubitConfig {
+export function readConfig(env: Record<string, string | undefined> = process.env): MubitConfig {
   const vm = (env.MUBIT_VERSION_MODE ?? 'model_suffix') as VersionMode;
   return {
     enabled: bool(env.MUBIT_ENABLED, false),

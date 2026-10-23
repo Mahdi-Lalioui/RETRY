@@ -15,7 +15,7 @@ function createNeonRepo(url: string): Repo {
   const db = drizzle(neon(url), { schema: s });
 
   function table<T extends { id: string }, N, F extends { limit?: number }>(
-    t: AnyTable, fill: (n: N) => T, where: (f: F) => (SQL | undefined)[], order: SQL,
+    t: AnyTable, fill: (n: s.WithOptionalId<N>) => T, where: (f: F) => (SQL | undefined)[], order: SQL,
   ): Table<T, N, F> {
     return {
       async insert(n) {

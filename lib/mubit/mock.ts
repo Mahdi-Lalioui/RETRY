@@ -103,7 +103,7 @@ function handleModal(c: Ctx, region: string, els: SnapEl[]): AgentAction | null 
   const kind = region.replace(/^modal:/, '');
   const rule: LearnedTag | null = kind === 'cookies' ? 'R5' : kind === 'upsell' ? 'R1' : kind === 'giftwrap' ? 'R7' : kind === 'newsletter' ? 'R6' : null;
   if (!rule) return click(decline ?? buttons[0], 'Dismiss the dialog to continue.');
-  if (c.knows(rule)) return decline ? click(decline, `House policy: ${kind === 'cookies' ? 'essential cookies only' : `decline ${kind}`}.`) : click(buttons[0], 'Dismiss the dialog.');
+  if (c.knows(rule)) return decline ? click(decline, kind === 'cookies' ? 'Choose essential cookies only.' : `Decline the optional ${kind}.`) : click(buttons[0], 'Dismiss the dialog.');
   if (kind === 'newsletter') {
     const cont = buttons.find((e) => /^continue$/i.test(e.label)) ?? accept;
     return click(cont ?? buttons[0], 'Continue past the newsletter prompt.');

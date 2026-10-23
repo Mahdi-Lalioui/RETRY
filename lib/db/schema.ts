@@ -54,8 +54,9 @@ export type ModelVersion = typeof modelVersions.$inferSelect; export type NewMod
 export type Eval = typeof evals.$inferSelect; export type NewEval = typeof evals.$inferInsert;
 
 // ---- Repo facade (identical for Neon + memory) ----
+export type WithOptionalId<N> = Omit<N, 'id'> & { id?: string };
 export interface Table<T, N, F> {
-  insert(row: N): Promise<T>;
+  insert(row: WithOptionalId<N>): Promise<T>;   // id generated (nanoid) when omitted
   update(id: string, patch: Partial<T>): Promise<T | null>;
   get(id: string): Promise<T | null>;
   list(filter?: F): Promise<T[]>;
