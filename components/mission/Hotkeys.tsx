@@ -28,8 +28,14 @@ export function Hotkeys() {
           stopAll(); break;
       }
     };
+    // A click inside a lane's shop moves keyboard focus into that iframe; pull it back so hotkeys keep working.
+    const onBlur = () => setTimeout(() => {
+      const a = document.activeElement;
+      if (a && a.tagName === 'IFRAME') (a as HTMLElement).blur();
+    }, 0);
     window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
+    window.addEventListener('blur', onBlur);
+    return () => { window.removeEventListener('keydown', onKey); window.removeEventListener('blur', onBlur); };
   }, []);
   return null;
 }

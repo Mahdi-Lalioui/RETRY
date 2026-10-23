@@ -42,7 +42,7 @@ export function TrainingRing() {
   return (
     <section className="panel relative flex min-h-0 min-w-0 items-center gap-3 overflow-hidden p-3">
       <div className="pointer-events-none absolute left-3 top-3 panel-label">Training ring</div>
-      <div className="relative aspect-square h-full max-h-[200px] min-h-0 shrink-0 pt-3">
+      <div className="relative aspect-square h-full max-h-[200px] min-h-0 max-w-[46%] shrink-0 pt-3">
         <svg viewBox="0 0 180 180" className="h-full w-full -rotate-90 overflow-visible">
           <defs>
             <filter id="ringglow" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="4" /></filter>

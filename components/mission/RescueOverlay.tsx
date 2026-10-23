@@ -25,6 +25,8 @@ export function RescueOverlay({ lane }: { lane: LaneId }) {
     if (!rescue) return;
     return bridge.onPick(lane, (p) => {
       patch({ picked: p, value: p.role === 'textbox' ? (useMission.getState().rescue?.value ?? '') : '' });
+      const a = document.activeElement;
+      if (a && a.tagName === 'IFRAME') (a as HTMLElement).blur();
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [!!rescue, lane]);
