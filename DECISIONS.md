@@ -1,0 +1,2 @@
+- Live rescues only on Base and RETRY lanes; GPT and ICL lanes end with their violation verdict (keeps the stage demo readable).
+- Modal overlay in the shop uses a solid dim instead of backdrop-blur (Chromium mirrors edges inside scaled iframes).

@@ -123,7 +123,8 @@ async function runLane(lane: LaneId, sig: AbortSignal) {
       if (newRule) { S().patchLane(lane, { flash: newRule }); play('alert'); }
 
       if (detectStuck(history, before, after, MAX_STEPS)) {
-        if (S().mode !== 'live') {
+        // Only open-model lanes are rescued live: their rescues train the adapter. GPT/ICL end with the verdict.
+        if (S().mode !== 'live' || lane === 'closed' || lane === 'icl') {
           stamp(lane, await finish(runId, lane, task.id, null, state, { status: newRule ? 'violation' : 'stuck', correct: false, reason: newRule ? `Broke house rule ${newRule}` : 'Agent got stuck', violations: state.violations }));
           return;
         }
