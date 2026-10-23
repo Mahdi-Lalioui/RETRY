@@ -1,26 +1,124 @@
 @import "tailwindcss";
 
+/* ── Design tokens (plan §14.1) ─────────────────────────────────────────── */
+@theme {
+  --color-bg: #07080B;
+  --color-grid: #11141A;
+  --color-panel: #0D1016;
+  --color-panel-2: #12161E;
+  --color-line: #1C222C;
+  --color-ink: #E8EDF5;
+  --color-muted: #7A8597;
+  --color-faint: #3A4352;
+  --color-mubit: #FF4500;
+  --color-learn: #22D3EE;
+  --color-base: #A78BFA;
+  --color-closed: #94A3B8;
+  --color-icl: #F472B6;
+  --color-pass: #34D399;
+  --color-fail: #F43F5E;
+  --color-rescue: #F59E0B;
+
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, SFMono-Regular, monospace;
+
+  --radius-panel: 12px;
+
+  --animate-breathe: breathe 2s ease-in-out infinite;
+  --animate-sweep: sweep 2s linear infinite;
+  --animate-shimmer: shimmer 6s ease-in-out infinite;
+  --animate-pulse-slow: pulse-slow 2s ease-in-out infinite;
+  --animate-blink: blink 1s steps(2, start) infinite;
+}
+
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --bg: var(--color-bg); --grid: var(--color-grid); --panel: var(--color-panel); --panel-2: var(--color-panel-2);
+  --border: var(--color-line); --text: var(--color-ink); --muted: var(--color-muted); --faint: var(--color-faint);
+  --mubit: var(--color-mubit); --learn: var(--color-learn); --base: var(--color-base); --closed: var(--color-closed);
+  --icl: var(--color-icl); --pass: var(--color-pass); --fail: var(--color-fail); --rescue: var(--color-rescue);
+  --radius: 12px;
+  color-scheme: dark;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
-
+html, body { height: 100%; }
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background-color: var(--bg);
+  color: var(--text);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  background-image:
+    radial-gradient(1200px 500px at 50% -10%, #ff45000f, transparent 70%),
+    linear-gradient(var(--grid) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+  background-size: 100% 100%, 32px 32px, 32px 32px;
+  background-position: 0 0, -1px -1px, -1px -1px;
+  overflow: hidden;
+  -webkit-font-smoothing: antialiased;
 }
+body::after {
+  content: ''; position: fixed; inset: 0; pointer-events: none; z-index: 60;
+  background: radial-gradient(ellipse at center, transparent 70%, rgba(0, 0, 0, .45));
+}
+
+.tnum, .font-mono { font-variant-numeric: tabular-nums; }
+
+/* Panels */
+.panel {
+  background: linear-gradient(180deg, #0f131a 0%, var(--panel) 100%);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: inset 0 1px 0 #ffffff08, 0 20px 60px -30px #000;
+}
+.panel-label {
+  font-family: var(--font-mono);
+  font-size: 10px; letter-spacing: .14em; text-transform: uppercase; color: var(--muted);
+}
+.caption { font-size: 11px; color: var(--faint); letter-spacing: .01em; }
+
+/* Running lane border sweep (conic gradient masked to the border) */
+.lane-sweep {
+  position: absolute; inset: -1px; border-radius: inherit; padding: 1px; pointer-events: none;
+  background: conic-gradient(from var(--sweep-angle, 0deg), transparent 0deg, var(--lane) 50deg, transparent 110deg, transparent 360deg);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor; mask-composite: exclude;
+  animation: sweep 2s linear infinite;
+}
+@property --sweep-angle { syntax: '<angle>'; inherits: false; initial-value: 0deg; }
+
+@keyframes sweep { to { --sweep-angle: 360deg; } }
+@keyframes breathe { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.04); } }
+@keyframes shimmer { 0% { transform: translateX(-120%); } 60%, 100% { transform: translateX(220%); } }
+@keyframes pulse-slow { 0%, 100% { opacity: 1; } 50% { opacity: .45; } }
+@keyframes blink { to { visibility: hidden; } }
+@keyframes rescue-pulse { 0%, 100% { box-shadow: 0 0 0 1px #F59E0B, 0 0 24px -4px #F59E0B88; } 50% { box-shadow: 0 0 0 1px #F59E0B88, 0 0 8px -4px #F59E0B44; } }
+@keyframes dash { to { stroke-dashoffset: -24; } }
+
+.rescue-pulse { animation: rescue-pulse 1.4s ease-in-out infinite; }
+.conduit-flow { stroke-dasharray: 2 10; animation: dash 1.2s linear infinite; }
+
+.idle-shimmer { position: absolute; inset: 0; overflow: hidden; pointer-events: none; border-radius: inherit; }
+.idle-shimmer::before {
+  content: ''; position: absolute; top: 0; bottom: 0; width: 40%;
+  background: linear-gradient(100deg, transparent, #ffffff0a 45%, #ffffff12 50%, #ffffff0a 55%, transparent);
+  animation: shimmer 6s ease-in-out infinite;
+}
+
+.glass {
+  background: linear-gradient(180deg, #ffffff0d, #ffffff06);
+  backdrop-filter: blur(24px) saturate(140%);
+  -webkit-backdrop-filter: blur(24px) saturate(140%);
+  border: 1px solid #ffffff14;
+  box-shadow: inset 0 1px 0 #ffffff12, 0 24px 60px -20px #000, 0 0 0 1px #00000060;
+}
+
+.scrollbar-none::-webkit-scrollbar { display: none; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.001ms !important; animation-iteration-count: 1 !important; transition-duration: 0.001ms !important; }
+  .idle-shimmer::before, .lane-sweep, .conduit-flow { animation: none !important; }
+}
+
+/* Mubit core flash on particle arrival */
+.mubit-core .core-halo { transition: opacity .4s ease; }
+@keyframes core-flash { 0% { opacity: 1; } 100% { opacity: .45; } }
+.mubit-core.core-flash .core-halo { animation: core-flash .5s ease-out; }
