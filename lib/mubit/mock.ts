@@ -268,6 +268,8 @@ const sleep = (ms: number) => (ms > 0 ? new Promise((r) => setTimeout(r, ms)) : 
 // Added by Agent D (additive): eval/bootstrap run the mock with zero wall-clock delay. Reported latencyMs is unchanged
 // (still the simulated figure), only the sleep is skipped, so a 48-run held-out eval finishes in seconds.
 const fastScope = new AsyncLocalStorage<boolean>();
+/** True inside withMockFast (bootstrap / held-out eval / attract): those stay simulated even with live lanes. */
+export function inMockFast(): boolean { return fastScope.getStore() === true; }
 export function withMockFast<T>(fn: () => Promise<T>): Promise<T> { return fastScope.run(true, fn); }
 
 const g = globalThis as unknown as { __mubitMockFeedback?: { id: string; at: string; f: FeedbackReq }[] };

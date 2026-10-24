@@ -13,7 +13,7 @@ export type Scope = 'heldout' | 'live';
 
 export interface StepEntry {
   idx: number; action: AgentAction; label?: string; result?: StepResult;
-  latencyMs: number; human?: boolean; stepId?: string;
+  latencyMs: number; human?: boolean; stepId?: string; callId?: string | null;
 }
 export interface BugReport { evidence: string; page: string; layoutTag: string; seed: number; taskId: string; bugs: BugId[]; steps: string[] }
 export interface LaneRuntime {
@@ -46,7 +46,7 @@ const freshLane = (): LaneRuntime => ({ status: 'idle', steps: [], thinking: fal
 
 export interface MissionState {
   mode: MissionMode;
-  health: { mubit: 'ok' | 'mock' | 'down' | 'unknown'; db: string; demoMode: boolean };
+  health: { mubit: 'ok' | 'mock' | 'down' | 'unknown'; db: string; demoMode: boolean; liveLanes?: string[] };
   seed: number; versionIndex: number; layoutTag: string; layoutFlash: number;
   taskId: string; bugs: BugId[]; iclOn: boolean; sound: boolean; running: boolean;
   frameEpoch: number; // bump to force iframe re-mount

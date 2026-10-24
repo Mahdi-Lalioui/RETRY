@@ -108,7 +108,7 @@ async function runLane(lane: LaneId, sig: AbortSignal) {
       if (S().health.mubit === 'down') void recheckHealth();
       recordEvent({ kind: 'step', sceneId: S().taskId, lane, runId, stepIdx, action: res.action, result: 'ok', latencyMs: res.latencyMs, costUsd: res.costUsd, promptChars: res.promptChars, snapshot: snap.snapshot });
       S().set({ calls: S().calls + 1 });
-      const entry = { idx: stepIdx, action: res.action, label: res.action.target ? labels[res.action.target] : undefined, latencyMs: res.latencyMs, stepId: res.stepId };
+      const entry = { idx: stepIdx, action: res.action, label: res.action.target ? labels[res.action.target] : undefined, latencyMs: res.latencyMs, stepId: res.stepId, callId: res.callId };
       S().patchLane(lane, (l) => ({
         thinking: false,
         steps: [...l.steps, entry],
@@ -271,8 +271,8 @@ let lastHealthAt = 0;
 async function recheckHealth(force = false) {
   if (!force && Date.now() - lastHealthAt < 5000) return;
   lastHealthAt = Date.now();
-  const h = await apiSafe<{ mubit: 'ok' | 'mock' | 'down'; db: string; demoMode: boolean }>('/api/health');
-  if (h) S().set({ health: { ...S().health, mubit: h.mubit, db: h.db } });
+  const h = await apiSafe<{ mubit: 'ok' | 'mock' | 'down'; db: string; demoMode: boolean; liveLanes?: string[] }>('/api/health');
+  if (h) S().set({ health: { ...S().health, mubit: h.mubit, db: h.db, liveLanes: h.liveLanes } });
 }
 
 export function patchCorrection(id: string, p: Partial<CorrectionView>) {
@@ -337,7 +337,10 @@ function resetFrames() {
   s.activeLanes().forEach((l) => bridge.reset(l, s.seed, s.versionIndex, s.bugs, s.taskId));
 }
 
+let booting: Promise<void> | null = null;
+
 export async function runAll() {
+  if (booting) await booting.catch(() => {}); // never run RETRY before its versions are loaded
   stopAll();
   const epoch = runEpoch;
   const s = S();
@@ -529,7 +532,11 @@ export async function loadMetrics(scope: Scope = S().scope) {
   S().set(patch);
 }
 
-export async function boot() {
+export function boot(): Promise<void> {
+  return (booting ??= bootOnce());
+}
+
+async function bootOnce() {
   // Agent E: D replays public/demo/session-default.json through the real lanes; Shift+R records a live session.
   if (!replayProvider) setReplayProvider(() => startReplay());
   installRecorderHotkey();

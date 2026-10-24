@@ -9,8 +9,11 @@ Return ONLY a JSON object: {"type": "...", "target": "...", "value": "...", "rea
 - target: an element id from the snapshot (e.g. "e7"). Required for click/type/select.
 - value: text to type or option to select. Only for type/select.
 - reason: one short sentence.
+Every goal means completing checkout: add the items, pay, and reach the order confirmation page.
 Use "done" only when the goal is verifiably complete (an order confirmation with an order number is visible).
 Use "report_bug" when the site prevents completing the goal or shows invalid data; put the evidence in reason.
+When a [modal:...] section is listed, a dialog is open: page elements behind it do not respond until you answer the dialog.
+If an action returned no_effect, do not repeat it; choose a different element.
 Follow house test policy.`;
 
 export const ICL_HEADER = 'HOUSE TEST POLICY EXAMPLES (learned from past human corrections):';

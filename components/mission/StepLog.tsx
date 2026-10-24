@@ -35,6 +35,9 @@ export function StepLog({ steps, color, idle }: { steps: StepEntry[]; color: str
                   {s.human && '✋ '}{describeAction(s.action, s.label)}
                 </span>
                 <span className="ml-auto shrink-0" style={{ color: resultColor[s.result ?? ''] ?? '#3A4352' }}>{s.result ? `→ ${s.result}` : s.action.type === 'done' || s.action.type === 'report_bug' ? '■' : '…'}</span>
+                {s.callId?.startsWith('mreq_') && (
+                  <span title={`Real Mubit request ${s.callId}`} className="shrink-0 rounded-[4px] border border-mubit/40 bg-mubit/10 px-1 text-[10px] text-[#FFB08A]">{s.callId.slice(0, 11)}…</span>
+                )}
                 {!s.human && <span className="w-11 shrink-0 text-right text-faint">{s.latencyMs}ms</span>}
               </motion.div>
             );

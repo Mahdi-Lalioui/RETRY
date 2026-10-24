@@ -28,7 +28,7 @@ describe('snapshot', () => {
   it('has the §9.1 header and region lines', () => {
     const snap = renderSnapshot(initialState(42, 1));
     expect(snap.split('\n')[0]).toMatch(/^PAGE home \| LAYOUT layout-v1 \| CART 0 items £0\.00$/);
-    for (const line of snap.split('\n').slice(1)) expect(line).toMatch(/^\[[^\]]+\] e\d+ /);
+    for (const line of snap.split('\n').slice(1).filter((l) => !l.startsWith('DIALOG OPEN'))) expect(line).toMatch(/^\[[^\]]+\] e\d+ /);
   });
   it('never contains semKeys', () => {
     for (let seed = 1; seed <= 20; seed++) {
