@@ -352,7 +352,11 @@ export async function trainNow() {
   const startedAt = Date.now();
   S().set({ training: { phase: 'training', progress: 0, startedAt } });
   let jobId: string | null = null;
-  try { jobId = (await api<{ jobId: string | null }>('/api/refresh', {})).jobId; } catch { /* automatic mode */ }
+  try {
+    const r = await api<{ jobId: string | null; skipped?: string }>('/api/refresh', {});
+    if (r.skipped) { S().set({ training: { phase: 'collecting', progress: 0, reason: r.skipped } }); play('alert'); return; }
+    jobId = r.jobId;
+  } catch { /* automatic mode */ }
   S().set({ training: { ...S().training, jobId } });
   polling = true;
   try {
