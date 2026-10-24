@@ -163,8 +163,7 @@ async function runLane(lane: LaneId, sig: AbortSignal) {
           });
           // [G] Never accept a "correction" that itself breaks a house rule or repeats the stuck no-op (it would teach the wrong thing).
           const why = !rescue ? null
-            : (rescue.pick.role === 'textbox' || rescue.pick.role === 'select') && !rescue.value?.trim() ? `Enter the value for “${rescue.pick.label}” first`
-            : state ? rejectPick(state, rescue.pick.semKey, rescue.value, preAct && res.action.target ? resolveTarget(preAct, res.action.target) : undefined) : null;
+            : missingValue(rescue.pick, rescue.value) ?? (state ? rejectPick(state, rescue.pick.semKey, rescue.value, preAct && res.action.target ? resolveTarget(preAct, res.action.target) : undefined) : null);
           if (!why) break;
           const cur = S().rescue;
           if (cur?.lane === lane) S().set({ rescue: why.startsWith('Enter the value') ? { ...cur, rejected: why } : { ...cur, picked: undefined, value: '', rejected: why } });
@@ -224,6 +223,11 @@ async function submitCorrection(lane: LaneId, stepId: string, bad: AgentAction, 
   } catch {
     patchCorrection(id, { status: 'failed' });
   }
+}
+
+/** A textbox/select pick needs a value, or the correction teaches an empty type/select. */
+export function missingValue(pick: { role: string; label: string }, value?: string): string | null {
+  return (pick.role === 'textbox' || pick.role === 'select') && !value?.trim() ? `Enter the value for “${pick.label}” first` : null;
 }
 
 /** Why a human pick cannot be a correction (null = acceptable). Pure: simulates the pick on the engine. */
