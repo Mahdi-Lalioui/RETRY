@@ -162,10 +162,12 @@ async function runLane(lane: LaneId, sig: AbortSignal) {
             sig.addEventListener('abort', () => resolve(null), { once: true });
           });
           // [G] Never accept a "correction" that itself breaks a house rule or repeats the stuck no-op (it would teach the wrong thing).
-          const why = rescue && state ? rejectPick(state, rescue.pick.semKey, rescue.value, preAct && res.action.target ? resolveTarget(preAct, res.action.target) : undefined) : null;
+          const why = !rescue ? null
+            : (rescue.pick.role === 'textbox' || rescue.pick.role === 'select') && !rescue.value?.trim() ? `Enter the value for “${rescue.pick.label}” first`
+            : state ? rejectPick(state, rescue.pick.semKey, rescue.value, preAct && res.action.target ? resolveTarget(preAct, res.action.target) : undefined) : null;
           if (!why) break;
           const cur = S().rescue;
-          if (cur?.lane === lane) S().set({ rescue: { ...cur, picked: undefined, value: '', rejected: why } });
+          if (cur?.lane === lane) S().set({ rescue: why.startsWith('Enter the value') ? { ...cur, rejected: why } : { ...cur, picked: undefined, value: '', rejected: why } });
           play('alert');
         }
         rescueWaiters.delete(lane);
