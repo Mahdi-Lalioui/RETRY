@@ -192,3 +192,14 @@ body::after {
   .grid-parallax, .core-ring, .hero-key, .idle-scan::after, .how-beam { animation: none !important; }
   .deck-tilt { transform: none; }
 }
+
+/* Agent H: /attract scoreboard ticker (transform-only marquee) */
+.ticker-track { width: max-content; animation: ticker 60s linear infinite; will-change: transform; }
+@keyframes ticker { from { transform: translate3d(0, 0, 0); } to { transform: translate3d(-50%, 0, 0); } }
+@media (prefers-reduced-motion: reduce) { .ticker-track { animation: none; } }
+
+/* Agent H: presenter mode (P) — hide dev chrome, enlarge narration for the stage */
+.presenter [data-dev] { display: none !important; }
+.presenter .story-strip { height: 34px; }
+.presenter .story-text { font-size: 15px; }
+@media (min-width: 1536px) { .presenter .story-strip { height: 54px; } .presenter .story-text { font-size: 21px; } }

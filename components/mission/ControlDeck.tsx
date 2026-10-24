@@ -4,7 +4,8 @@ import { Bug, ChevronDown, Dices, HeartPulse, Layers, MonitorPlay, Play, Refresh
 import type { BugId } from '@/lib/shop/state';
 import { useMission } from '@/lib/store/mission';
 import { TASKS } from '@/lib/shop/tasks';
-import { breakCheckout, heal, judgesTurn, runAll, setTask, shipNewVersion, stopAll, toggleDemo, toggleIcl, trainNow } from '@/lib/agent/loop';
+import { judgeWithIntro } from './judge';
+import { breakCheckout, heal, runAll, setTask, shipNewVersion, stopAll, toggleDemo, toggleIcl, trainNow } from '@/lib/agent/loop';
 import { Button } from '@/components/ui/Button';
 import { Kbd } from '@/components/ui/Kbd';
 import { Tooltip } from '@/components/ui/Tooltip';
@@ -50,7 +51,7 @@ export function ControlDeck() {
             <DeckBtn icon={<Play className={ic} fill="currentColor" />} label="Run all" k="R" onClick={() => void runAll()} variant="primary" tip="Run every lane on the current ticket" always />
           </span>
         )}
-        <DeckBtn icon={<Dices className={ic} />} label="Judge's turn" k="J" onClick={() => void judgesTurn()} tip="Random unseen seed ≥10000, random ticket, 30% bug chance" always />
+        <DeckBtn icon={<Dices className={ic} />} label="Judge's turn" k="J" onClick={() => void judgeWithIntro()} tip="Random unseen seed ≥10000, random ticket, 30% bug chance" always />
         <span className="mx-1 h-5 w-px bg-white/10" />
         <DeckBtn icon={<Rocket className={ic} />} label="Ship new version" k="S" onClick={shipNewVersion} tip="Reshuffle the site: new unseen layout" />
         <span className="relative">
@@ -80,7 +81,7 @@ export function ControlDeck() {
           <Button onClick={() => set({ sound: !sound })} aria-label="Toggle sound">{sound ? <Volume2 className={ic} /> : <VolumeX className={ic} />}</Button>
         </Tooltip>
         <span className="mx-1 h-5 w-px bg-white/10" />
-        <label className="relative inline-flex h-8 items-center gap-1 rounded-[9px] border border-white/10 bg-white/[0.04] pl-2 pr-6 text-[12px] text-white/85 hover:bg-white/[0.07]">
+        <label data-dev className="relative inline-flex h-8 items-center gap-1 rounded-[9px] border border-white/10 bg-white/[0.04] pl-2 pr-6 text-[12px] text-white/85 hover:bg-white/[0.07]">
           <span className="font-mono text-[11px] text-muted">ticket</span>
           <select value={taskId} style={{ maxWidth: 'clamp(120px, 14vw, 300px)' }} onChange={(e) => setTask(e.target.value)} className="cursor-pointer appearance-none bg-transparent font-mono text-[12px] text-white outline-none" aria-label="Task">
             {TASKS.map((t) => <option key={t.id} value={t.id} className="bg-[#12161E]">{t.id} · {t.goal.slice(0, 42)}</option>)}

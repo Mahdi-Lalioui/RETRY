@@ -15,7 +15,7 @@ export function fmt(v: number | null | undefined, unit?: string): string {
   return Number.isInteger(v) ? String(v) : v.toFixed(v < 1 ? 2 : 1);
 }
 
-function CountUp({ value, unit, k }: { value: number | null | undefined; unit?: string; k: number }) {
+function CountUp({ value, unit, k, delay = 0 }: { value: number | null | undefined; unit?: string; k: number; delay?: number }) {
   const ref = useRef<HTMLSpanElement>(null);
   const from = useRef(0);
   useEffect(() => {
@@ -23,11 +23,12 @@ function CountUp({ value, unit, k }: { value: number | null | undefined; unit?: 
     if (!el) return;
     if (value === null || value === undefined) { el.textContent = '—'; return; }
     const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    const start = performance.now();
+    const start = performance.now() + (reduce ? 0 : delay);
+    const dur = delay ? 1100 : 600;
     const a = from.current;
     let raf = 0;
     const step = (t: number) => {
-      const p = reduce ? 1 : Math.min(1, (t - start) / 600);
+      const p = reduce ? 1 : Math.max(0, Math.min(1, (t - start) / dur));
       const e = 1 - Math.pow(1 - p, 3);
       const cur = a + (value - a) * e;
       el.textContent = fmt(p >= 1 ? value : Number.isInteger(value) && unit !== '$' ? Math.round(cur) : cur, unit);
@@ -36,7 +37,7 @@ function CountUp({ value, unit, k }: { value: number | null | undefined; unit?: 
     };
     raf = requestAnimationFrame(step);
     return () => cancelAnimationFrame(raf);
-  }, [value, unit, k]);
+  }, [value, unit, k, delay]);
   return <span ref={ref} className="tnum relative">—</span>;
 }
 
@@ -59,6 +60,12 @@ export function Scoreboard() {
   const iclOn = useMission((s) => s.iclOn);
   const adapted = useMission((s) => s.adapted.label);
   const set = useMission((s) => s.set);
+  const phase = useMission((s) => s.training.phase);
+  // Count-up after a promotion waits for the training ring to finish closing (≈900ms spring), then rolls.
+  const promotedAt = useRef(0);
+  if (phase === 'promoted' && !promotedAt.current) promotedAt.current = Date.now();
+  if (phase !== 'promoted') promotedAt.current = 0;
+  const cdelay = promotedAt.current ? Math.max(0, 900 - (Date.now() - promotedAt.current)) : 0;
   const lanes: LaneId[] = iclOn ? ['closed', 'base', 'adapted', 'icl'] : ['closed', 'base', 'adapted'];
   const label = (l: LaneId) => (l === 'adapted' ? `RETRY ${adapted}` : l === 'base' ? 'Base v1' : l === 'closed' ? 'GPT' : 'ICL');
   const baseSuccess = rows.find((r) => r.key === 'success' || /success/i.test(r.label))?.values.base ?? null;
@@ -118,7 +125,7 @@ export function Scoreboard() {
                           {delta !== null && delta !== 0 && (
                             <span className="mr-1 text-[11px]" style={{ color: good ? '#34D399' : '#F43F5E' }}>{delta > 0 ? '▲' : '▼'}</span>
                           )}
-                          <CountUp value={v} unit={row.unit} k={k} />
+                          <CountUp value={v} unit={row.unit} k={k} delay={l === 'adapted' ? cdelay : 0} />
                         </td>
                       );
                     })}
@@ -128,7 +135,7 @@ export function Scoreboard() {
             </tbody>
           </table>
         </div>
-        <div className="caption hidden truncate 2xl:block">{scope === 'heldout' ? 'Held-out suite · 48 runs on seeds never used in training · best in cyan' : 'Live runs this session'}</div>
+        <div data-dev className="caption hidden truncate 2xl:block">{scope === 'heldout' ? 'Held-out suite · 48 runs on seeds never used in training · best in cyan' : 'Live runs this session'}</div>
       </div>
       <div className="flex min-h-0 min-w-0 flex-1 flex-col border-l border-white/[0.05] pl-3">
         <div className="flex items-center gap-2">
@@ -140,7 +147,7 @@ export function Scoreboard() {
           </span>
         </div>
         <div className="min-h-0 flex-1"><LearningCurve points={curve} baseLine={baseSuccess} /></div>
-        <div className="caption hidden truncate 2xl:block">verified success vs cumulative corrections · one dot per version</div>
+        <div data-dev className="caption hidden truncate 2xl:block">verified success vs cumulative corrections · one dot per version</div>
       </div>
     </section>
   );

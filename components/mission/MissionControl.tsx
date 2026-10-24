@@ -18,6 +18,9 @@ import { StoryStrip } from './StoryStrip';
 import { HowMubit } from './HowMubit';
 import { IdleHero } from './IdleHero';
 import { PromotionFX } from './PromotionFX';
+import { JudgeIntro } from './JudgeIntro';
+import { BugDrop } from './BugDrop';
+import { Presenter } from './Presenter';
 
 export function MissionControl() {
   const iclOn = useMission((s) => s.iclOn);
@@ -46,6 +49,8 @@ export function MissionControl() {
             </div>
             <IdleHero />
             <PromotionFX />
+            <JudgeIntro />
+            <BugDrop />
           </div>
         </LayoutGroup>
         <StoryStrip />
@@ -60,6 +65,7 @@ export function MissionControl() {
       <FlyingCards />
       <Hotkeys />
       <HowMubit />
+      <Presenter />
     </main>
   );
 }
