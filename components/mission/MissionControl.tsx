@@ -39,7 +39,7 @@ export function MissionControl() {
               style={{
                 gridTemplateColumns: `repeat(${lanes.length}, minmax(0, 1fr))`,
                 // lane height follows the 16:10 shop at full column width, capped so the bottom row keeps room
-                height: `min(calc((100vw - 48px - ${(lanes.length - 1) * 12}px) / ${lanes.length} * 0.625 + 112px), calc(100dvh - 400px))`,
+                height: `min(calc((100vw - 48px - ${(lanes.length - 1) * 12}px) / ${lanes.length} * 0.625 + 112px), calc(100dvh - 425px))`,
               }}
             >
               {lanes.map((l) => <Lane key={l} lane={l} />)}

@@ -19,7 +19,7 @@ export function IdleHero() {
             <div className="mt-3 flex items-center justify-center gap-[0.35em] text-[clamp(30px,3.6vw,68px)] font-bold leading-none tracking-[-0.035em] text-white">
               Press <kbd className="hero-key">R</kbd> to run the night shift
             </div>
-            <div className="mx-auto mt-4 max-w-[46ch] text-[clamp(13px,1vw,18px)] leading-snug text-[#B8C1CE]">“{task.goal}” — same ticket, same shop, three testers. Watch which one knows your house rules.</div>
+            <div className="mx-auto mt-4 max-w-[56ch] text-[clamp(13px,1vw,18px)] leading-snug text-[#B8C1CE]">“{task.goal}” — same ticket, same shop, three testers. Watch which one knows your house rules.</div>
             <div className="mt-4 flex items-center justify-center gap-5 font-mono text-[clamp(11px,0.75vw,13px)] text-[#9AA4B4]">
               <span><kbd className="hero-key-sm">J</kbd> judge’s turn</span>
               <span><kbd className="hero-key-sm">S</kbd> ship new layout</span>

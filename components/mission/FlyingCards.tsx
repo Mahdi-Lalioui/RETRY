@@ -40,24 +40,39 @@ function Flying({ f, done }: { f: Flight; done: () => void }) {
   const sy = f.from.top + f.from.height / 2 - H / 2;
   const cx = f.core.left + f.core.width / 2 - W / 2;
   const cy = f.core.top + f.core.height / 2 - H / 2;
-  const tx = f.to.left;
+  const tx = f.to.left + (f.to.width - W) / 2;
   const ty = f.to.top;
+  const ts = Math.min(1, f.to.width / W);
+  // Arc: lift → curve up and over toward the core (peak above the straight line) → swallowed → arc down into the tray → overshoot + settle.
+  const ax = (sx + cx) / 2, ay = Math.min(sy, cy) - 70;
+  const bx = (cx + tx) / 2 + (tx < cx ? -60 : 60), by = (cy + ty) / 2 - 40;
+  const kf = {
+    x: [sx, sx, sx, ax, cx, cx, bx, tx, tx, tx],
+    y: [sy + 24, sy, sy, ay, cy, cy, by, ty + 10, ty - 3, ty],
+    scale: [0.6, 1.04, 1, 0.6, 0.2, 0.2, 0.7, ts * 1.04, ts * 0.99, ts],
+    rotate: [0, -2, -2, -8, 0, 0, 6, -1.5, 0.6, 0],
+    opacity: [0, 1, 1, 1, 0.95, 0.95, 1, 1, 1, 1],
+  };
+  const times = [0, 0.1, 0.3, 0.46, 0.6, 0.68, 0.82, 0.92, 0.97, 1];
   return (
-    <motion.div
-      className="absolute left-0 top-0"
-      style={{ width: W, transformOrigin: '50% 50%' }}
-      initial={{ x: sx, y: sy + 20, scale: 0.6, opacity: 0 }}
-      animate={{
-        x: [sx, sx, sx, cx, cx, tx + (f.to.width - W) / 2],
-        y: [sy + 20, sy, sy, cy, cy, ty],
-        scale: [0.6, 1, 1, 0.22, 0.22, Math.min(1, f.to.width / W)],
-        opacity: [0, 1, 1, 0.9, 0.9, 1],
-        filter: ['drop-shadow(0 0 0 #F59E0B00)', 'drop-shadow(0 0 24px #F59E0B88)', 'drop-shadow(0 0 24px #F59E0B88)', 'drop-shadow(0 0 30px #FF4500)', 'drop-shadow(0 0 30px #FF4500)', 'drop-shadow(0 0 0 #F59E0B00)'],
-      }}
-      transition={{ duration: 3.0, times: [0, 0.12, 0.38, 0.6, 0.7, 1], ease: 'easeInOut' }}
-      onAnimationComplete={done}
-    >
-      <CorrectionCard c={{ ...c, status: c.status === 'queued' ? 'queued' : c.status }} />
-    </motion.div>
+    <>
+      {/* motion-blur trail: cheap amber ghosts following the same path, slightly behind */}
+      {[1, 2, 3].map((i) => (
+        <motion.div key={i} className="absolute left-0 top-0 rounded-[10px]" style={{ width: W, height: H, background: 'linear-gradient(90deg, #F59E0B, #F59E0B33)', opacity: 0, transformOrigin: '50% 50%' }}
+          initial={{ x: sx, y: sy + 24, scale: 0.6, opacity: 0 }}
+          animate={{ ...kf, opacity: [0, 0, 0.12 / i, 0.16 / i, 0.12 / i, 0, 0.1 / i, 0, 0, 0] }}
+          transition={{ duration: 3.0, times, ease: 'easeInOut', delay: i * 0.045 }} />
+      ))}
+      <motion.div
+        className="absolute left-0 top-0 rounded-[10px]"
+        style={{ width: W, transformOrigin: '50% 50%', boxShadow: '0 0 40px -4px #F59E0Baa, 0 20px 50px -10px #000' }}
+        initial={{ x: sx, y: sy + 24, scale: 0.6, opacity: 0 }}
+        animate={kf}
+        transition={{ duration: 3.0, times, ease: 'easeInOut' }}
+        onAnimationComplete={done}
+      >
+        <CorrectionCard c={{ ...c, status: c.status === 'queued' ? 'queued' : c.status }} />
+      </motion.div>
+    </>
   );
 }

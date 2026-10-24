@@ -3,7 +3,7 @@ import { CartesianGrid, Line, LineChart, ReferenceLine, ResponsiveContainer, Too
 import type { CurvePoint, IclPoint } from '@/lib/eval/board';
 import type { BoardRow } from '@/lib/eval/board';
 
-const AX = { stroke: '#3A4352', fontSize: 12, fontFamily: 'var(--font-geist-mono), monospace' };
+const AX = { fill: '#9AA4B4', stroke: 'none', fontSize: 12, fontFamily: 'var(--font-geist-mono), monospace' };
 
 function TipBox({ children }: { children: React.ReactNode }) {
   return <div className="panel-2 px-3 py-2 text-[12px] shadow-xl">{children}</div>;
@@ -13,7 +13,7 @@ function TipBox({ children }: { children: React.ReactNode }) {
 export function LearningCurve({ curve, icl, board, height = 420, compact = false }: { curve: CurvePoint[]; icl: IclPoint[]; board: BoardRow[]; height?: number; compact?: boolean }) {
   const base = board.find((r) => r.lane === 'base')?.verifiedSuccess ?? curve[0]?.verifiedSuccess ?? null;
   const gpt = board.find((r) => r.lane === 'closed')?.verifiedSuccess ?? null;
-  const pts = curve.map((p) => ({ x: p.corrections, y: p.verifiedSuccess === null ? null : Math.round(p.verifiedSuccess * 100), label: p.label, status: p.status, recall: p.bugRecall }));
+  const pts = curve.map((p, i) => ({ below: i > 0 && (p.corrections - curve[i - 1].corrections) < Math.max(10, ...curve.map((c) => c.corrections)) * 0.06, x: p.corrections, y: p.verifiedSuccess === null ? null : Math.round(p.verifiedSuccess * 100), label: p.label, status: p.status, recall: p.bugRecall }));
   const iclPts = [{ x: 0, y: base === null ? null : Math.round(base * 100) }, ...icl.map((p) => ({ x: p.corrections, y: p.verifiedSuccess === null ? null : Math.round(p.verifiedSuccess * 100) }))];
   const maxX = Math.max(10, ...pts.map((p) => p.x), ...iclPts.map((p) => p.x));
   return (
@@ -28,8 +28,8 @@ export function LearningCurve({ curve, icl, board, height = 420, compact = false
             label={compact ? undefined : { value: 'cumulative corrections (training examples)', position: 'insideBottom', offset: -14, fill: '#7A8597', fontSize: 12 }} />
           <YAxis type="number" domain={[0, 100]} ticks={[0, 25, 50, 75, 100]} tickFormatter={(v) => `${v}%`} tick={AX} tickLine={false} axisLine={false}
             label={compact ? undefined : { value: 'verified task success · held-out', angle: -90, position: 'insideLeft', offset: 14, fill: '#7A8597', fontSize: 12 }} />
-          {gpt !== null && <ReferenceLine y={Math.round(gpt * 100)} stroke="#94A3B8" strokeDasharray="6 6" strokeOpacity={0.7} label={{ value: `GPT ${Math.round(gpt * 100)}%`, fill: '#94A3B8', fontSize: 11, position: 'insideTopLeft' }} />}
-          {base !== null && <ReferenceLine y={Math.round(base * 100)} stroke="#A78BFA" strokeDasharray="3 5" strokeOpacity={0.8} label={{ value: `Base v1 ${Math.round(base * 100)}%`, fill: '#A78BFA', fontSize: 11, position: 'insideTopRight' }} />}
+          {gpt !== null && <ReferenceLine y={Math.round(gpt * 100)} stroke="#94A3B8" strokeDasharray="6 6" strokeOpacity={0.7} label={{ value: base !== null && Math.round(base * 100) === Math.round(gpt * 100) ? `GPT · Base v1 ${Math.round(gpt * 100)}%` : `GPT ${Math.round(gpt * 100)}%`, fill: '#94A3B8', fontSize: 11, position: 'insideTopLeft' }} />}
+          {base !== null && (gpt === null || Math.round(base * 100) !== Math.round(gpt * 100)) && <ReferenceLine y={Math.round(base * 100)} stroke="#A78BFA" strokeDasharray="3 5" strokeOpacity={0.8} label={{ value: `Base v1 ${Math.round(base * 100)}%`, fill: '#A78BFA', fontSize: 11, position: 'insideTopRight' }} />}
           <Tooltip cursor={{ stroke: '#3A4352' }} content={({ payload }) => {
             const p = payload?.[0]?.payload as { x: number; y: number; label?: string; status?: string; recall?: number | null } | undefined;
             if (!p) return null;
@@ -45,7 +45,7 @@ export function LearningCurve({ curve, icl, board, height = 420, compact = false
                 <g key={`${payload?.label}-${cx}`}>
                   {cur && <circle cx={cx} cy={cy} r={13} fill="#22D3EE22" stroke="#22D3EE55" />}
                   <circle cx={cx} cy={cy} r={6.5} fill={held ? '#07080B' : '#22D3EE'} stroke={held ? '#F43F5E' : '#07080B'} strokeWidth={held ? 2.5 : 2} />
-                  <text x={cx} y={cy - 16} textAnchor="middle" fill={held ? '#F43F5E' : '#E8EDF5'} fontSize={compact ? 11 : 13} fontFamily="var(--font-geist-mono), monospace" fontWeight={600}>{payload?.label}{held ? ' ✕' : ''}</text>
+                  <text x={cx} y={(payload as { below?: boolean } | undefined)?.below ? cy + 26 : cy - 16} textAnchor="middle" fill={held ? '#F43F5E' : '#E8EDF5'} fontSize={compact ? 11 : 13} fontFamily="var(--font-geist-mono), monospace" fontWeight={600}>{payload?.label}{held ? ' ✕' : ''}</text>
                 </g>
               );
             }} name="RETRY (adapter via Mubit)" />
