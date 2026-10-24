@@ -12,10 +12,10 @@ Have only one copy of the app open (laptop and Vercel share the same database).
 | 0:45 | click **No thanks**, **Enter** | Card flies through the Mubit core into the tray (1 human + 8 augmented). Base breaks R1 again → "a rescue can't change a model mid-run" | "That rescue is now a training pair for the exact call that failed, re-rendered on 8 layouts." |
 | 1:05 | — | RETRY v4 passes | "RETRY already learned these from last night's rescues." |
 | 1:15 | **S** | New release ships: layout-v6 adds a brand-new rule, **R7 decline gift wrap** | "Your team just shipped a redesign with a new rule." |
-| 1:20 | **R** | RETRY v5 clicks "Add gift wrap" → **POLICY VIOLATION R7** → rescue opens on RETRY | "Even our own model hasn't seen this one." |
-| 1:35 | click **No gift wrap**, **Enter** | Card flies to Mubit; RETRY breaks R7 again → "Press T: Mubit turns the rescue into v6" | |
-| 1:45 | **T** | Ring: Mubit building update → evaluating on 48 held-out runs → **v6 +R7 promoted** (~18 s) | "Versioned, evaluated on runs it never trained on, promoted only if nothing regresses. Reversible." |
-| 2:10 | **R** | RETRY v6 declines gift wrap → **PASS** | "One rescue. One update. Fixed." |
+| 1:20 | **R** | RETRY v4 clicks "Add gift wrap" → **POLICY VIOLATION R7** → rescue opens on RETRY | "Even our own model hasn't seen this one." |
+| 1:35 | click **No gift wrap**, **Enter** | Card flies to Mubit; RETRY breaks R7 again → "Press T: Mubit turns the rescue into v5" | |
+| 1:45 | **T** | Ring: Mubit building update → evaluating on 48 held-out runs → **v5 +R7 promoted** (~18 s) | "Versioned, evaluated on runs it never trained on, promoted only if nothing regresses. Reversible." |
+| 2:10 | **R** | RETRY v5 declines gift wrap → **PASS** | "One rescue. One update. Fixed." |
 | 2:25 | **J** (hand to a judge) | Judge's turn on an unseen seed: RETRY passes, others break rules | |
 | 2:40 | **B**, **2**, **R** | Dead pay button → RETRY files a **Regression detected** ticket | "And it still knows a redesign from a real bug." |
 | 2:55 | — | | "Self-healing tools guess. RETRY learns your rules. Every call through Mubit. Every rescue a model update." |
