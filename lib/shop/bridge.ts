@@ -114,6 +114,12 @@ export function installBridge(host: BridgeHost): () => void {
         highlight = !!m.enabled;
         host.setHighlight(highlight);
         break;
+      case 'retry:restore': { // Agent E: roll back to a previous state (rescue happens on the pre-violation page)
+        const s = m.state as ShopState;
+        if (s && s.layout) host.setState(s);
+        post({ type: 'retry:apply:res', reqId: m.reqId, result: 'ok', ...reply(host.getState()) });
+        break;
+      }
       case 'retry:apply': {
         const r = applyAction(host.getState(), String(m.semKey), m.value === undefined ? undefined : String(m.value));
         host.setState(r.state);

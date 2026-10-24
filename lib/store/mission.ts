@@ -29,6 +29,8 @@ export interface CorrectionView {
   id: string; lane: LaneId; rule?: RuleId | 'other'; ruleText?: string;
   bad: { action: AgentAction; label?: string }; good: { action: AgentAction; label?: string };
   augmented: number; status: 'queued' | 'sent' | 'trained' | 'failed'; landed: boolean; at: number;
+  /** Agent E: 'scripted' = overnight solver backlog (never shown as human); undefined/'human' = a person. */
+  source?: 'human' | 'scripted';
 }
 export interface ScoreRow {
   key: string; label: string; unit?: string; better: 'higher' | 'lower';

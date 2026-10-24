@@ -79,7 +79,7 @@ function mix(h: number): number { // avalanche: FNV-1a alone correlates keys tha
 }
 const coin = (key: string, p: number) => (mix(hash(key)) % 1000) / 1000 < p;
 
-const DECLINE = /no thanks|skip|not now|without|essential|necessary|reject|decline|maybe later|no,? thank|dismiss|close|^×$|^x$/i;
+const DECLINE = /^no\b|no thanks|skip|not now|without|essential|necessary|reject|decline|maybe later|no,? thank|dismiss|close|^×$|^x$/i;
 const ADD = /\badd\b|get it/i;
 const CART = /cart|bag|basket/i;
 const CHECKOUT = /checkout|payment|proceed|secure/i;

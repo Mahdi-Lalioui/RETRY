@@ -55,7 +55,10 @@ function modelRefFor(lane: LaneId) {
 async function finish(runId: string, lane: LaneId, taskId: string, finalAction: AgentAction | null, state: ShopState | null, fallback: Verdict): Promise<Verdict> {
   try {
     if (!state) return fallback;
-    return await api<Verdict>('/api/agent/finish', { runId, lane, taskId, finalAction, finalState: state, stuck: finalAction === null });
+    const v = await api<Verdict>('/api/agent/finish', { runId, lane, taskId, finalAction, finalState: state, stuck: finalAction === null });
+    // A run that ended on a house-rule violation shows a violation verdict, not "stuck" (the judge's stuck flag wins server-side).
+    if (!finalAction && fallback.status === 'violation' && v.status === 'stuck') return { ...v, status: 'violation', reason: fallback.reason };
+    return v;
   } catch { return fallback; }
 }
 
@@ -116,6 +119,7 @@ async function runLane(lane: LaneId, sig: AbortSignal) {
       }
 
       const before = state?.violations.length ?? 0;
+      const preAct = state;
       const actRes = await bridge.act(lane, res.action);
       check(sig);
       state = actRes.state;
@@ -138,6 +142,11 @@ async function runLane(lane: LaneId, sig: AbortSignal) {
         S().patchLane(lane, { rescueQueued: true });
         try { await Promise.race([prevRescue, new Promise((r) => sig.addEventListener('abort', r, { once: true }))]); } finally { S().patchLane(lane, { rescueQueued: false }); }
         if (sig.aborted) { release(); throw new Aborted(); }
+        // The human teaches the decision the model got wrong, so put the shop back on the page *before* the bad action
+        // (e.g. the upsell modal is open again and "Not now" can be picked). The violation stays in the step log.
+        if (newRule && preAct) {
+          try { state = (await bridge.restore(lane, preAct)).state; } catch { /* keep current page */ }
+        }
         S().patchLane(lane, { status: 'rescue' });
         S().set({ rescue: { lane, stepId: res.stepId, badAction: res.action, badLabel: entry.label, autoRule: newRule, rule: newRule, otherText: '', value: '' } });
         bridge.highlight(lane, true);
@@ -422,7 +431,8 @@ export async function boot() {
     s.set({ counts: { rescues, examples: corrections.length, sinceVersion: since } });
     // Show the most recent human rescues in the tray (if the API returns their actions).
     const recent: CorrectionView[] = corrections
-      .filter((c) => c.source === 'human' && c.goodAction && typeof c.goodAction === 'object')
+      .filter((c) => (c.source === 'human' || c.source === 'scripted') && c.goodAction && typeof c.goodAction === 'object')
+      .sort((a, b) => Number(b.source === 'human') - Number(a.source === 'human'))
       .slice(0, 5)
       .map((c, i) => ({
         id: c.id ?? `srv_${i}`, lane: (c.lane as LaneId) ?? 'base',
@@ -430,6 +440,7 @@ export async function boot() {
         ruleText: c.rule && !/^R[1-7]$/.test(c.rule) ? c.rule.replace(/^other:/, '') : undefined,
         bad: { action: (c.badAction as AgentAction) ?? { type: 'click', reason: '' }, label: c.badLabel },
         good: { action: c.goodAction as AgentAction, label: c.goodLabel },
+        source: c.source === 'scripted' ? 'scripted' as const : 'human' as const,
         augmented: 8, status: c.status === 'trained' || c.versionId ? 'trained' : c.status === 'failed' ? 'failed' : 'sent', landed: true, at: Date.now() - i,
       }));
     if (recent.length && S().corrections.length === 0) s.set({ corrections: recent });

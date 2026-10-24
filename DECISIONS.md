@@ -19,3 +19,6 @@
 - [E] Shift+R live recorder installed from boot() as a capture-phase window listener (Hotkeys.tsx untouched); download on second press.
 - [E] Adapted lane: an unknown client versionId resolves by badge label, then to the instance's promoted version (was silently naive → "Yes, add cover" after promotion on another instance).
 - [E] REVEAL_R7_AT stays 6: Mission Control starts at layout-v4, so "Ship new version" reaches R7 on the 2nd press.
+- [E] Live rescue after a violation restores the pre-action shop state (new bridge msg `retry:restore`) so the human picks the right element on the page where the model went wrong.
+- [E] Mock DECLINE regex matches "No gift wrap" (was unmatched → learned-R7 versions still clicked the first button, often "Add gift wrap").
+- [E] Mission tray on boot shows bootstrap corrections too, marked `source:'scripted'` on CorrectionView.
