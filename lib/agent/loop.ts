@@ -7,6 +7,7 @@ import { LANES } from '@/lib/agent/lanes';
 import { detectStuck } from '@/lib/agent/stuck';
 import { getTask, TASKS } from '@/lib/shop/tasks';
 import { bugsAffecting } from '@/lib/shop/bugs';
+import { applyAction, resolveTarget } from '@/lib/shop/engine';
 import { api, apiSafe } from '@/lib/store/api';
 import { bridge, waitReady, type Pick } from '@/lib/store/frames';
 import { emit } from '@/lib/store/bus';
@@ -147,13 +148,25 @@ async function runLane(lane: LaneId, sig: AbortSignal) {
         if (newRule && preAct) {
           try { state = (await bridge.restore(lane, preAct)).state; } catch { /* keep current page */ }
         }
+        // [G] Stop/replay may have aborted us while restoring: never open a rescue for a dead run (it would hang forever).
+        if (sig.aborted) { release(); throw new Aborted(); }
         S().patchLane(lane, { status: 'rescue' });
         S().set({ rescue: { lane, stepId: res.stepId, badAction: res.action, badLabel: entry.label, autoRule: newRule, rule: newRule, otherText: '', value: '' } });
         bridge.highlight(lane, true);
-        const rescue = await new Promise<RescueResult | null>((resolve) => {
-          rescueWaiters.set(lane, resolve);
-          sig.addEventListener('abort', () => resolve(null), { once: true });
-        });
+        let rescue: RescueResult | null = null;
+        for (;;) {
+          rescue = await new Promise<RescueResult | null>((resolve) => {
+            rescueWaiters.set(lane, resolve);
+            if (sig.aborted) resolve(null);
+            sig.addEventListener('abort', () => resolve(null), { once: true });
+          });
+          // [G] Never accept a "correction" that itself breaks a house rule or repeats the stuck no-op (it would teach the wrong thing).
+          const why = rescue && state ? rejectPick(state, rescue.pick.semKey, rescue.value, preAct && res.action.target ? resolveTarget(preAct, res.action.target) : undefined) : null;
+          if (!why) break;
+          const cur = S().rescue;
+          if (cur?.lane === lane) S().set({ rescue: { ...cur, picked: undefined, value: '', rejected: why } });
+          play('alert');
+        }
         rescueWaiters.delete(lane);
         release();
         bridge.highlight(lane, false);
@@ -207,6 +220,15 @@ async function submitCorrection(lane: LaneId, stepId: string, bad: AgentAction, 
   } catch {
     patchCorrection(id, { status: 'failed' });
   }
+}
+
+/** Why a human pick cannot be a correction (null = acceptable). Pure: simulates the pick on the engine. */
+export function rejectPick(state: ShopState, semKey: string, value: string | undefined, badSemKey?: string): string | null {
+  let r: ReturnType<typeof applyAction>;
+  try { r = applyAction(state, semKey, value || undefined); } catch { return null; }
+  if (r.state.violations.length > state.violations.length) return `That breaks house rule ${r.state.violations[r.state.violations.length - 1]}: pick the right element`;
+  if (semKey === badSemKey && r.effect === 'no_effect') return 'That is the move that got RETRY stuck: pick a different element';
+  return null;
 }
 
 export function patchCorrection(id: string, p: Partial<CorrectionView>) {

@@ -24,6 +24,8 @@ export interface LaneRuntime {
 export interface RescueState {
   lane: LaneId; stepId: string; badAction: AgentAction; badLabel?: string; autoRule?: RuleId;
   picked?: Pick; rule?: RuleId | 'other'; otherText: string; value: string;
+  /** [G] set when the last pick was refused (it breaks a house rule / repeats the stuck move); overlay should show it. */
+  rejected?: string;
 }
 export interface CorrectionView {
   id: string; lane: LaneId; rule?: RuleId | 'other'; ruleText?: string;

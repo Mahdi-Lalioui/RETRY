@@ -58,7 +58,7 @@ describe('matrix: fully-learned mock', () => {
       const r = await simulateRun({ task: t, seed, versionIndex: v, bugs: [], lane: 'adapted' });
       n++; expect(r.steps.length).toBeLessThanOrEqual(16);
       if (r.verdict.status === 'passed') pass++; else bad.push(`${t.id} v${v} s${seed} ${r.verdict.status} ${r.verdict.reason}`);
-      if (r.verdict.status === 'bug_reported' || r.verdict.status === 'false_alarm') falseAlarm++;
+      if (r.steps.at(-1)?.action.type === 'report_bug') falseAlarm++;
       const b = BUGS[(seed + v) % 4];
       if (bugsAffecting(t, [b]).length) {
         const rb = await simulateRun({ task: t, seed, versionIndex: v, bugs: [b], lane: 'adapted' });
