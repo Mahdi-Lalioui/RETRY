@@ -2,6 +2,7 @@
 import OpenAI from 'openai';
 import type { ChatReq, ChatRes, FeedbackReq, ModelVersionInfo, MubitClient } from './types';
 import { cfg, type MubitConfig } from './config';
+import { noteMubit, redact } from './health';
 
 /** "closed:gpt-4o-mini" → "gpt-4o-mini"; "open:llama" → "llama". */
 export function stripLane(model: string): string { return model.replace(/^(closed|open):/, ''); }
@@ -87,11 +88,20 @@ export function createRealClient(c: MubitConfig = cfg()): MubitClient {
       const model = resolveModel(c, req.model, req.versionId);
       const headers = versionHeaders(c, req.versionId);
       const t0 = performance.now();
-      const { data, response } = await oai.chat.completions.create({
-        model, messages: req.messages, temperature: req.temperature ?? 0, seed: req.seed,
-        response_format: req.jsonMode && c.supportsJsonMode ? { type: 'json_object' } : undefined,
-        metadata: c.supportsMetadata ? req.metadata : undefined,
-      }, { headers }).withResponse();
+      let data: OpenAI.Chat.Completions.ChatCompletion; let response: Response;
+      try {
+        ({ data, response } = await oai.chat.completions.create({
+          model, messages: req.messages, temperature: req.temperature ?? 0, seed: req.seed,
+          response_format: req.jsonMode && c.supportsJsonMode ? { type: 'json_object' } : undefined,
+          metadata: c.supportsMetadata ? req.metadata : undefined,
+        }, { headers }).withResponse());
+        noteMubit(true);
+      } catch (e) {
+        noteMubit(false, e);
+        const ms = Math.round(performance.now() - t0);
+        const timeout = /timed? ?out|abort/i.test((e as Error)?.name + ' ' + (e as Error)?.message);
+        throw new Error(timeout ? `Mubit timed out after ${ms}ms` : `Mubit unreachable: ${redact((e as Error)?.message ?? String(e))}`);
+      }
       const latencyMs = Math.round(performance.now() - t0);
       const usage = { in: data.usage?.prompt_tokens ?? 0, out: data.usage?.completion_tokens ?? 0 };
       console.log(`[mubit] chat lane=${req.metadata?.lane ?? '-'} model=${model} ${latencyMs}ms ${usage.in}/${usage.out} tok`);

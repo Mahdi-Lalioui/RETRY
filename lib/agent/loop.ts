@@ -92,6 +92,7 @@ async function runLane(lane: LaneId, sig: AbortSignal) {
       }, sig);
       check(sig);
       emit('call', { lane, ms: res.latencyMs });
+      if (S().health.mubit === 'down') void recheckHealth();
       recordEvent({ kind: 'step', sceneId: S().taskId, lane, runId, stepIdx, action: res.action, result: 'ok', latencyMs: res.latencyMs, costUsd: res.costUsd, promptChars: res.promptChars, snapshot: snap.snapshot });
       S().set({ calls: S().calls + 1 });
       const entry = { idx: stepIdx, action: res.action, label: res.action.target ? labels[res.action.target] : undefined, latencyMs: res.latencyMs, stepId: res.stepId };
@@ -192,6 +193,7 @@ async function runLane(lane: LaneId, sig: AbortSignal) {
     stamp(lane, await finish(runId, lane, task.id, null, state, { status: 'stuck', correct: false, reason: `Step budget (${MAX_STEPS}) exceeded`, violations: state?.violations ?? [] }));
   } catch (e) {
     if (e instanceof Aborted || sig.aborted) { S().patchLane(lane, { status: S().lanes[lane].verdict ? 'done' : 'idle', thinking: false }); return; }
+    void recheckHealth(true);
     S().patchLane(lane, { status: 'done', thinking: false, error: e instanceof Error ? e.message : String(e) });
     stamp(lane, { status: 'failed', correct: false, reason: e instanceof Error ? e.message.slice(0, 90) : 'Lane error', violations: [] });
   }
@@ -229,6 +231,15 @@ export function rejectPick(state: ShopState, semKey: string, value: string | und
   if (r.state.violations.length > state.violations.length) return `That breaks house rule ${r.state.violations[r.state.violations.length - 1]}: pick the right element`;
   if (semKey === badSemKey && r.effect === 'no_effect') return 'That is the move that got RETRY stuck: pick a different element';
   return null;
+}
+
+let lastHealthAt = 0;
+/** [G] Keep the TopBar pill honest mid-session: re-read /api/health after a lane error and while it reads down. */
+async function recheckHealth(force = false) {
+  if (!force && Date.now() - lastHealthAt < 5000) return;
+  lastHealthAt = Date.now();
+  const h = await apiSafe<{ mubit: 'ok' | 'mock' | 'down'; db: string; demoMode: boolean }>('/api/health');
+  if (h) S().set({ health: { ...S().health, mubit: h.mubit, db: h.db } });
 }
 
 export function patchCorrection(id: string, p: Partial<CorrectionView>) {
@@ -274,6 +285,7 @@ export async function runAll() {
     await runLane(lane, c.signal);
   }));
   if (lanes.every((l) => !controllers.get(l)?.signal.aborted)) S().set({ running: false });
+  if (S().health.mubit === 'down') void recheckHealth(true); // [G] pill recovers once Mubit answers again
   void loadMetrics();
 }
 
