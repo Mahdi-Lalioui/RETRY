@@ -3,7 +3,7 @@ import { nanoid } from 'nanoid';
 import type { StepRequest, StepResponse, ModelRef, AgentAction } from './types';
 import type { Msg } from '@/lib/mubit/types';
 import type { ShopState } from '@/lib/shop/state';
-import { getMubit } from '@/lib/mubit';
+import { getMubitFor } from '@/lib/mubit';
 import { buildMessages, promptChars, snapshotIds } from './prompt';
 import { INVALID_FALLBACK, parseAction, retryMessage } from './parse';
 import { costUsd } from '@/lib/pricing';
@@ -14,7 +14,7 @@ import { LANES } from './lanes';
 export interface DecideOpts { iclExamples?: string[] }
 
 export async function decide(req: StepRequest, opts: DecideOpts = {}): Promise<StepResponse & { messages: Msg[] }> {
-  const mubit = getMubit();
+  const mubit = getMubitFor(req.lane);
   const messages = buildMessages({ goal: req.goal, history: req.history, snapshot: req.snapshot, lane: req.lane, iclExamples: opts.iclExamples });
   const ids = snapshotIds(req.snapshot);
   const base = {

@@ -10,6 +10,9 @@ The sections below retain the original handover context; this update supersedes 
 
 The full app is built, tested locally, and pushed to `main`. Tonight it ran on the **mock Mubit client**, because this sandbox had no network access to Mubit or OpenAI. The TopBar shows a yellow **MOCK MODE** pill until real Mubit is configured.
 
+## Recommended stage setup (verified 24 Oct, live)
+`MUBIT_ENABLED=false MUBIT_LIVE_LANES=closed` with `MUBIT_BASE_URL=https://api.mubit.ai/openai/v1` and the Mubit key: the GPT lane makes **real** calls through Mubit (real `mreq_…` ids in the step log, pill "GPT LIVE VIA MUBIT"), while the open-model lanes + learning loop stay simulated and labelled. Bootstrap/held-out eval/attract always stay simulated (fast, free). `npx tsx --env-file=.env.local scripts/mubit-warm.ts 24` sends real calls of RETRY's task so Mubit can train a real adapter on it (check the console's Adapters page). ~160 such calls were already sent on 24 Oct.
+
 ## 1. Run it locally (2 min)
 ```bash
 git pull

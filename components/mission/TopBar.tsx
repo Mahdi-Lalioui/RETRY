@@ -35,8 +35,10 @@ function Clock() {
 function MubitPill() {
   const health = useMission((s) => s.health);
   const mode = health.mubit;
+  const live = health.liveLanes ?? [];
   const cfg =
-    mode === 'mock' ? { dot: '#FACC15', text: 'MOCK MODE', sub: 'mock model client · not real Mubit', cls: 'border-yellow-400/40 bg-yellow-400/10 text-yellow-300' }
+    mode === 'mock' && live.length ? { dot: '#34D399', text: `${live.includes('closed') ? 'GPT' : live.join(' + ')} LIVE VIA MUBIT`, sub: 'real calls through api.mubit.ai for this lane · open-model lanes and the learning loop are simulated (MOCK)', cls: 'border-pass/40 bg-pass/10 text-pass' }
+    : mode === 'mock' ? { dot: '#FACC15', text: 'MOCK MODE', sub: 'mock model client · not real Mubit', cls: 'border-yellow-400/40 bg-yellow-400/10 text-yellow-300' }
       : mode === 'down' ? { dot: '#F43F5E', text: 'MUBIT UNREACHABLE', sub: 'check /api/health', cls: 'border-fail/40 bg-fail/10 text-fail' }
         : mode === 'ok' ? { dot: '#34D399', text: 'Mubit configured', sub: 'live requests use Mubit; model and adapter availability depend on the configured integration', cls: 'border-white/10 bg-white/[0.04] text-white/80' }
           : { dot: '#7A8597', text: 'connecting…', sub: '', cls: 'border-white/10 bg-white/[0.03] text-white/50' };
@@ -47,7 +49,7 @@ function MubitPill() {
           <span className="absolute inset-0 rounded-full opacity-60 animate-ping" style={{ background: cfg.dot, animationDuration: '2s' }} />
           <span className="relative h-2 w-2 rounded-full" style={{ background: cfg.dot, boxShadow: `0 0 8px ${cfg.dot}` }} />
         </span>
-        <span className={`whitespace-nowrap ${mode === 'mock' || mode === 'down' ? 'font-mono tracking-wider' : ''}`}>{cfg.text}</span>
+        <span className={`whitespace-nowrap ${(mode === 'mock' && !live.length) || mode === 'down' ? 'font-mono tracking-wider' : ''}`}>{cfg.text}</span>
       </span>
     </Tooltip>
   );

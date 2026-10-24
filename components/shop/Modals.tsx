@@ -42,7 +42,7 @@ function CookieSheet() {
 
 function Dialog({ modal, icon, title, children }: { modal: ModalId; icon: React.ReactNode; title: string; children: React.ReactNode }) {
   return (
-    <motion.div role="dialog" aria-label={title} initial={{ scale: 0.94, opacity: 0, y: 10 }} animate={{ scale: 1, opacity: 1, y: 0 }} exit={{ scale: 0.96, opacity: 0 }}
+    <motion.div role="dialog" aria-modal="true" aria-label={title} initial={{ scale: 0.94, opacity: 0, y: 10 }} animate={{ scale: 1, opacity: 1, y: 0 }} exit={{ scale: 0.96, opacity: 0 }}
       transition={{ type: 'spring', stiffness: 300, damping: 26 }}
       className="w-[480px] rounded-[20px] bg-white p-7 shadow-[0_40px_100px_-30px_rgba(0,0,0,.5)] ring-1 ring-black/[0.06]">
       <span className="grid h-12 w-12 place-items-center rounded-full bg-[#EAF0E9] text-[#1F3D2B]">{icon}</span>

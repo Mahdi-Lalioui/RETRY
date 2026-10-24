@@ -19,7 +19,13 @@ export interface RefreshStatus {
   gate?: GateDecision;
 }
 
-export async function startRefresh(): Promise<{ jobId: string | null; mode: 'explicit' | 'automatic'; versionId: string }> {
+export async function startRefresh(): Promise<{ jobId: string | null; mode: 'explicit' | 'automatic'; versionId: string; skipped?: string }> {
+  // [G] A version trained on zero new corrections is a duplicate (and costs a real Mubit job): refuse it.
+  const training = (await repo.versions.list({ status: 'training' }))[0];
+  if (!training && mubitMode() === 'mock' && (await queuedCount()) === 0) {
+    const cur = await repo.versions.current();
+    return { jobId: null, mode: 'automatic', versionId: cur?.id ?? 'v1', skipped: 'No new corrections since the last version' };
+  }
   const mubit = getMubit();
   const mode = mubitMode();
   const existing = (await repo.versions.list({ status: 'training' }))[0];

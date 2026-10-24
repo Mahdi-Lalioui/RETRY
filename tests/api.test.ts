@@ -46,6 +46,11 @@ describe('API routes (mock + memory)', () => {
     expect(r.status).toBe(400); expect((await json(r)).ok).toBe(false);
   });
 
+  it('[G] step with a malformed state is rejected cleanly (400, not 500)', async () => {
+    const r = await step(post({ ...stepBody('base', 'run_junk'), state: { junk: true } }));
+    expect(r.status).toBe(400); expect((await json(r)).ok).toBe(false);
+  });
+
   it('rescue → refresh → promoted version declines the upsell', async () => {
     const s1 = await json(await step(post(stepBody('base', 'run_a'))));
     expect(s1.ok).toBe(true);
@@ -98,5 +103,16 @@ describe('API routes (mock + memory)', () => {
     // Agent D: refresh now runs the 48-run held-out eval (v1 + v2) before promotion, so the board prefers those rows.
     expect(s.data.partialMetrics.runs).toBe(4);
     expect(m.data.rows.find((r: { lane: string }) => r.lane === 'base').runs).toBe(48);
+  });
+});
+
+describe('[G] cold instance', () => {
+  it('a step naming a version this instance never saw bootstraps, so RETRY is not served as the naive base', async () => {
+    const { resetBootstrapCache } = await import('@/lib/train/bootstrap');
+    const repo = resetMemoryRepo(); resetBootstrapCache();
+    const r = await json(await step(post({ ...stepBody('adapted', 'run_cold'), modelRef: { kind: 'open', model: 'open:open-base', versionId: 'ver_v6_other', label: 'RETRY v6' } })));
+    expect(r.ok).toBe(true);
+    expect((await repo.versions.list()).length).toBeGreaterThan(1);
+    expect(r.data.action).toMatchObject({ type: 'click', target: 'e3' }); // declines the upsell
   });
 });

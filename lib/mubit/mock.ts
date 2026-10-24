@@ -6,7 +6,7 @@ import { AsyncLocalStorage } from 'node:async_hooks';
 import { nanoid } from 'nanoid';
 import type { ChatReq, ChatRes, FeedbackReq, ModelVersionInfo, MubitClient, Msg } from './types';
 import type { AgentAction } from '@/lib/agent/types';
-import type { LearnedTag, ModelVersion } from '@/lib/db/schema';
+import type { Correction, LearnedTag, ModelVersion } from '@/lib/db/schema';
 import { repo } from '@/lib/db';
 import { findVersion, learnedFromCorrections, nextVersionLabel } from '@/lib/db/queries';
 import { readConfig } from './config';
@@ -268,6 +268,8 @@ const sleep = (ms: number) => (ms > 0 ? new Promise((r) => setTimeout(r, ms)) : 
 // Added by Agent D (additive): eval/bootstrap run the mock with zero wall-clock delay. Reported latencyMs is unchanged
 // (still the simulated figure), only the sleep is skipped, so a 48-run held-out eval finishes in seconds.
 const fastScope = new AsyncLocalStorage<boolean>();
+/** True inside withMockFast (bootstrap / held-out eval / attract): those stay simulated even with live lanes. */
+export function inMockFast(): boolean { return fastScope.getStore() === true; }
 export function withMockFast<T>(fn: () => Promise<T>): Promise<T> { return fastScope.run(true, fn); }
 
 const g = globalThis as unknown as { __mubitMockFeedback?: { id: string; at: string; f: FeedbackReq }[] };
@@ -339,7 +341,7 @@ export function createMockClient(): MubitClient {
       const label = await nextVersionLabel();
       const v = await repo.versions.insert({
         id: `ver_${label}_${nanoid(4)}`, label, mubitVersionId: `mock-${label}`, baseModel: c.openBaseModel,
-        examples: all.length, status: 'training', promoted: false, rules: learnedFromCorrections(all), createdAt: new Date(),
+        examples: all.length, status: 'training', promoted: false, rules: mockLearnedRules(all), createdAt: new Date(),
       });
       await repo.versions.update(v.id, { jobId: v.id });
       return { jobId: v.id, mode: 'explicit' as const };
@@ -366,4 +368,17 @@ export function createMockClient(): MubitClient {
       return (await repo.versions.list()).map((v) => toInfo(v, c.mockTrainSeconds));
     },
   };
+}
+
+/**
+ * [G] Mock learning can also regress: corrections that overrule a bug report with "done" teach the model to push broken
+ * checkouts through. When they outweigh the report_bug corrections the version forgets BUG (bug recall drops → the gate
+ * holds it back). Real Mubit decides this itself; this only keeps the mock honest about a bad training set.
+ */
+export function mockLearnedRules(all: (Pick<Correction, 'rule' | 'goodAction' | 'badAction'> & { source?: string })[]): LearnedTag[] {
+  const rules = learnedFromCorrections(all);
+  const roots = all.filter((c) => c.source !== 'augmented'); // augmented rows carry no badAction; count the decisions
+  const suppress = roots.filter((c) => c.goodAction?.type === 'done' && c.badAction?.type === 'report_bug').length;
+  const report = roots.filter((c) => c.goodAction?.type === 'report_bug').length;
+  return suppress > 0 && suppress >= report ? rules.filter((r) => r !== 'BUG') : rules;
 }

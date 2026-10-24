@@ -17,6 +17,7 @@ export function renderElement(e: AgentElement): string {
 export function renderSnapshot(state: ShopState): string {
   const t = totals(state);
   const lines = [`PAGE ${state.page} | LAYOUT ${state.layout.layoutTag} | CART ${t.items} item${t.items === 1 ? '' : 's'} ${formatPence(t.merchandise + t.extras)}`];
+  if (state.openModals.length) lines.push(`DIALOG OPEN: ${state.openModals[0]} — answer it first; the page behind it is blocked`);
   let region: string | null = null;
   let parts: string[] = [];
   const flush = () => { if (region !== null) lines.push(`[${region}] ${parts.join(' | ')}`); };

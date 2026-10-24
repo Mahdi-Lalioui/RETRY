@@ -7,6 +7,7 @@ import { LANES } from '@/lib/agent/lanes';
 import { detectStuck } from '@/lib/agent/stuck';
 import { getTask, TASKS } from '@/lib/shop/tasks';
 import { bugsAffecting } from '@/lib/shop/bugs';
+import { applyAction, resolveTarget } from '@/lib/shop/engine';
 import { api, apiSafe } from '@/lib/store/api';
 import { bridge, waitReady, type Pick } from '@/lib/store/frames';
 import { emit } from '@/lib/store/bus';
@@ -104,9 +105,10 @@ async function runLane(lane: LaneId, sig: AbortSignal) {
       }, sig);
       check(sig);
       emit('call', { lane, ms: res.latencyMs });
+      if (S().health.mubit === 'down') void recheckHealth();
       recordEvent({ kind: 'step', sceneId: S().taskId, lane, runId, stepIdx, action: res.action, result: 'ok', latencyMs: res.latencyMs, costUsd: res.costUsd, promptChars: res.promptChars, snapshot: snap.snapshot });
       S().set({ calls: S().calls + 1 });
-      const entry = { idx: stepIdx, action: res.action, label: res.action.target ? labels[res.action.target] : undefined, latencyMs: res.latencyMs, stepId: res.stepId };
+      const entry = { idx: stepIdx, action: res.action, label: res.action.target ? labels[res.action.target] : undefined, latencyMs: res.latencyMs, stepId: res.stepId, callId: res.callId };
       S().patchLane(lane, (l) => ({
         thinking: false,
         steps: [...l.steps, entry],
@@ -170,7 +172,16 @@ async function runLane(lane: LaneId, sig: AbortSignal) {
           S().patchLane(lane, { status: 'rescue' });
           S().set({ rescue: { lane, stepId: res.stepId, badAction: res.action, badLabel: entry.label, autoRule: newRule, rule: newRule, otherText: '', value: '' } });
           bridge.highlight(lane, true);
-          rescue = await untilAbort(new Promise<RescueResult | null>((resolve) => { rescueWaiters.set(lane, resolve); }), sig);
+          for (;;) {
+            rescue = await untilAbort(new Promise<RescueResult | null>((resolve) => { rescueWaiters.set(lane, resolve); }), sig);
+            // [G] Never accept a "correction" that itself breaks a house rule or repeats the stuck no-op (it would teach the wrong thing).
+            const why = !rescue ? null
+              : missingValue(rescue.pick, rescue.value) ?? (state ? rejectPick(state, rescue.pick.semKey, rescue.value, preAct && res.action.target ? resolveTarget(preAct, res.action.target) : undefined) : null);
+            if (!why) break;
+            const cur = S().rescue;
+            if (cur?.lane === lane) S().set({ rescue: why.startsWith('Enter the value') ? { ...cur, rejected: why } : { ...cur, picked: undefined, value: '', rejected: why } });
+            play('alert');
+          }
         } finally {
           release();
           // A newer run may already own this lane and its rescue waiter.
@@ -208,6 +219,7 @@ async function runLane(lane: LaneId, sig: AbortSignal) {
   } catch (e) {
     if (S().lanes[lane].runId !== runId) return;
     if (e instanceof Aborted || sig.aborted) { S().patchLane(lane, { status: S().lanes[lane].verdict ? 'done' : 'idle', thinking: false }); return; }
+    void recheckHealth(true);
     S().patchLane(lane, { status: 'done', thinking: false, error: e instanceof Error ? e.message : String(e) });
     stamp(lane, { status: 'failed', correct: false, reason: e instanceof Error ? e.message.slice(0, 90) : 'Lane error', violations: [] });
   }
@@ -238,6 +250,29 @@ async function submitCorrection(lane: LaneId, stepId: string, bad: AgentAction, 
   } catch {
     patchCorrection(id, { status: 'failed' });
   }
+}
+
+/** A textbox/select pick needs a value, or the correction teaches an empty type/select. */
+export function missingValue(pick: { role: string; label: string }, value?: string): string | null {
+  return (pick.role === 'textbox' || pick.role === 'select') && !value?.trim() ? `Enter the value for “${pick.label}” first` : null;
+}
+
+/** Why a human pick cannot be a correction (null = acceptable). Pure: simulates the pick on the engine. */
+export function rejectPick(state: ShopState, semKey: string, value: string | undefined, badSemKey?: string): string | null {
+  let r: ReturnType<typeof applyAction>;
+  try { r = applyAction(state, semKey, value || undefined); } catch { return null; }
+  if (r.state.violations.length > state.violations.length) return `That breaks house rule ${r.state.violations[r.state.violations.length - 1]}: pick the right element`;
+  if (semKey === badSemKey && r.effect === 'no_effect') return 'That is the move that got RETRY stuck: pick a different element';
+  return null;
+}
+
+let lastHealthAt = 0;
+/** [G] Keep the TopBar pill honest mid-session: re-read /api/health after a lane error and while it reads down. */
+async function recheckHealth(force = false) {
+  if (!force && Date.now() - lastHealthAt < 5000) return;
+  lastHealthAt = Date.now();
+  const h = await apiSafe<{ mubit: 'ok' | 'mock' | 'down'; db: string; demoMode: boolean; liveLanes?: string[] }>('/api/health');
+  if (h) S().set({ health: { ...S().health, mubit: h.mubit, db: h.db, liveLanes: h.liveLanes } });
 }
 
 export function patchCorrection(id: string, p: Partial<CorrectionView>) {
@@ -302,7 +337,10 @@ function resetFrames() {
   s.activeLanes().forEach((l) => bridge.reset(l, s.seed, s.versionIndex, s.bugs, s.taskId));
 }
 
+let booting: Promise<void> | null = null;
+
 export async function runAll() {
+  if (booting) await booting.catch(() => {}); // never run RETRY before its versions are loaded
   stopAll();
   const epoch = runEpoch;
   const s = S();
@@ -326,7 +364,11 @@ export async function runAll() {
       if (!c.signal.aborted && epoch === runEpoch) S().patchLane(lane, { error: String(e), status: 'done' });
     } finally { if (controllers.get(lane) === c) controllers.delete(lane); }
   }));
-  if (epoch === runEpoch) { S().set({ running: false }); void loadMetrics(); }
+  if (epoch === runEpoch) {
+    S().set({ running: false });
+    if (S().health.mubit === 'down') void recheckHealth(true); // [G] pill recovers once Mubit answers again
+    void loadMetrics();
+  }
 }
 
 export function nextUnseenSeed(): number {
@@ -406,7 +448,8 @@ export async function trainNow() {
   S().set({ training: { phase: 'training', progress: 0, startedAt } });
   polling = true;
   try {
-    const { jobId, versionId } = await api<{ jobId: string | null; versionId?: string }>('/api/refresh', {});
+    const { jobId, versionId, skipped } = await api<{ jobId: string | null; versionId?: string; skipped?: string }>('/api/refresh', {});
+    if (skipped) { S().set({ training: { phase: 'collecting', progress: 0, reason: skipped } }); play('alert'); return; }
     const pollId = jobId ?? versionId;
     S().set({ training: { ...S().training, jobId: pollId ?? null } });
     let failures = 0;
@@ -489,7 +532,11 @@ export async function loadMetrics(scope: Scope = S().scope) {
   S().set(patch);
 }
 
-export async function boot() {
+export function boot(): Promise<void> {
+  return (booting ??= bootOnce());
+}
+
+async function bootOnce() {
   // Agent E: D replays public/demo/session-default.json through the real lanes; Shift+R records a live session.
   if (!replayProvider) setReplayProvider(() => startReplay());
   installRecorderHotkey();
