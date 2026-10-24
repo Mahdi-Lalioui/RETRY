@@ -6,11 +6,12 @@ import type { LaneId } from '@/lib/agent/types';
 import { simulateRun } from '@/lib/agent/sim';
 import { LANES } from '@/lib/agent/lanes';
 import { repo, type Eval } from '@/lib/db';
+import { findVersion } from '@/lib/db/queries';
 import { getTask } from '@/lib/shop/tasks';
 import { mubitMode } from '@/lib/mubit';
 import { withMockFast } from '@/lib/mubit/mock';
 import { suiteItems, type SuiteName } from './suite';
-import { computeMetrics, type EvalMetrics } from './metrics';
+import { computeMetrics, EVALUATION_ERROR_PREFIX, type EvalMetrics } from './metrics';
 
 export interface EvalConfig { lane: LaneId; versionId: string | null; suite: SuiteName; label?: string; examples?: number }
 export interface EvalProgress { config: EvalConfig; final?: false; partial?: EvalMetrics | null }
@@ -32,6 +33,19 @@ export function finalMetrics(ev: Eval | null | undefined): FinalEvalMetrics | nu
 }
 
 export async function startEval(config: EvalConfig): Promise<Eval> {
+  if (config.lane === 'closed' || config.lane === 'icl') {
+    if (config.versionId !== null) throw new Error(`The ${config.lane} lane cannot evaluate an adapted version`);
+  } else {
+    const v = config.versionId
+      ? await findVersion(config.versionId)
+      : config.lane === 'base' ? await findVersion('v1') : await repo.versions.current();
+    if (!v) throw new Error(`Unknown version ${config.versionId ?? config.lane}`);
+    if (v.status !== 'ready') throw new Error(`Version ${v.label} is not ready for evaluation`);
+    if (config.lane === 'base' && v.id !== 'v1') throw new Error('The base lane cannot evaluate an adapted version');
+    // Pin the canonical local identity before any chunks run. A later promotion must not
+    // change the model being measured or label another version's results as this one.
+    config = { ...config, versionId: v.id, label: config.label ?? v.label, examples: v.examples ?? 0 };
+  }
   return repo.evals.insert({
     versionId: config.versionId, lane: config.lane, total: suiteItems(config.suite).length, done: 0,
     metrics: { config } satisfies EvalProgress, createdAt: new Date(),
@@ -69,12 +83,25 @@ async function doAdvance(ev0: Eval, opts: { all?: boolean }): Promise<Eval> {
   const slice = items.slice(done, done + size);
   const modelRef = config.versionId ? { ...LANES[config.lane].modelRef(), versionId: config.versionId } : undefined;
   const work = () => pool(slice, mock ? 8 : concurrency(), async (it) => {
+    const runId = `${ev.id}_${String(it.idx).padStart(2, '0')}`;
     try {
       await simulateRun({
         task: getTask(it.taskId), seed: it.seed, versionIndex: 1, bugs: it.bugs, lane: config.lane, modelRef,
-        persist: true, evalId: ev.id, runId: `${ev.id}_${String(it.idx).padStart(2, '0')}`,
+        persist: true, evalId: ev.id, runId,
       });
-    } catch (e) { console.error('[eval]', ev.id, it.idx, (e as Error).message); }
+    } catch (e) {
+      const message = e instanceof Error ? e.message : String(e);
+      console.error('[eval]', ev.id, it.idx, message);
+      // An unavailable provider or failed simulation is still a failed trial. Never remove
+      // it from the denominator while claiming that all scheduled runs were evaluated.
+      const steps = await repo.steps.list({ runId });
+      await repo.runs.insert({
+        id: runId, lane: config.lane, model: (modelRef ?? LANES[config.lane].modelRef()).model,
+        versionId: config.versionId, taskId: it.taskId, seed: it.seed, layoutTag: 'layout-v1', bugs: it.bugs,
+        status: 'failed', correct: false, reason: `${EVALUATION_ERROR_PREFIX}${message}`, violations: [],
+        steps: steps.length, isEval: true, evalId: ev.id, endedAt: new Date(),
+      });
+    }
   });
   await (mock ? withMockFast(work) : work());
   const newDone = Math.min(items.length, done + slice.length);

@@ -7,9 +7,9 @@ import { useMission } from '@/lib/store/mission';
 import { Kbd } from '@/components/ui/Kbd';
 
 const STEPS = [
-  { icon: Route, color: '#FF4500', title: 'Route every call', body: 'Every next-action decision of every lane — GPT, Base, RETRY, ICL — is one model call sent through Mubit.', stat: (s: Stats) => `${s.calls.toLocaleString('en-GB')} calls routed this session` },
-  { icon: Hand, color: '#F59E0B', title: 'Capture the rescue', body: 'When a lane breaks a house rule or gets stuck, a human clicks the right element. That becomes the preferred output for that exact call, sent to Mubit as feedback.', stat: (s: Stats) => `${s.rescues} rescues · ${s.examples.toLocaleString('en-GB')} examples` },
-  { icon: GitBranch, color: '#22D3EE', title: 'Versioned update', body: 'Mubit builds a new adapter version on the open model from the collected corrections: v1 → v2 → … Each version is kept, so it can be rolled back.', stat: (s: Stats) => `RETRY lane serving ${s.label}` },
+  { icon: Route, color: '#FF4500', title: 'Route every call', body: 'Live next-action decisions use the configured Mubit endpoint. Mock mode simulates the same decisions for rehearsal.', stat: (s: Stats) => `${s.calls.toLocaleString('en-GB')} decisions this session` },
+  { icon: Hand, color: '#F59E0B', title: 'Capture the rescue', body: 'When a lane breaks a house rule or gets stuck, a human chooses the right action. The exact training pair is saved and queued for delivery. The ledger shows its delivery status.', stat: (s: Stats) => `${s.rescues} rescues · ${s.examples.toLocaleString('en-GB')} examples` },
+  { icon: GitBranch, color: '#22D3EE', title: 'Versioned update', body: 'The version lifecycle runs in mock mode. Live updates require confirmed feedback, training and adapter-serving APIs; public Mubit compares adapters in its console.', stat: (s: Stats) => `RETRY version ${s.label}` },
   { icon: ShieldCheck, color: '#34D399', title: 'Gate on held-out eval', body: 'Before promotion each version runs 48 held-out checkouts on seeds never used in training (16 with real bugs). It is promoted only if success and bug recall don’t drop.', stat: () => '48 held-out runs · disjoint seeds' },
 ];
 interface Stats { calls: number; rescues: number; examples: number; label: string }
@@ -19,6 +19,7 @@ export function HowMubit() {
   const calls = useMission((s) => s.calls);
   const counts = useMission((s) => s.counts);
   const label = useMission((s) => s.adapted.label);
+  const mock = useMission((s) => s.health.mubit === 'mock');
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const t = e.target as HTMLElement | null;
@@ -47,6 +48,7 @@ export function HowMubit() {
               </div>
               <button onClick={() => setOpen(false)} className="ml-auto flex items-center gap-2 rounded-lg border border-white/15 px-3 py-1.5 text-[13px] text-white/80 hover:bg-white/5"><X className="h-4 w-4" /> close <Kbd>Esc</Kbd></button>
             </div>
+            <p className="mt-4 text-[14px] text-rescue">{mock ? 'MOCK REHEARSAL · Model calls, training and benchmark results are simulated.' : 'Live inference uses Mubit. Adapter training and serving require a confirmed integration.'}</p>
             <div className="relative mt-8 grid grid-cols-4 gap-5">
               {/* connecting beam */}
               <div className="how-beam pointer-events-none absolute left-[6%] right-[6%] top-[58px] h-[2px]" />

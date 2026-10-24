@@ -11,20 +11,31 @@ import { api, apiSafe } from '@/lib/store/api';
 import { bridge, waitReady, type Pick } from '@/lib/store/frames';
 import { emit } from '@/lib/store/bus';
 import { MAX_STEPS, REFRESH_MIN_EXAMPLES } from '@/lib/store/lanes';
-import { useMission, type CorrectionView, type CurvePoint, type ScoreRow, type Scope } from '@/lib/store/mission';
+import type { CorrectionView, CurvePoint, ScoreRow, Scope } from '@/lib/store/mission';
 import { play } from '@/lib/store/sfx';
-import { installRecorderHotkey, recordEvent, startReplay, stopReplay } from './demo-driver';
+import { installRecorderHotkey, liveMissionState, recordEvent, startReplay, stopReplay } from './demo-driver';
 
-const S = () => useMission.getState();
+const S = liveMissionState;
 const controllers = new Map<LaneId, AbortController>();
 const rescueWaiters = new Map<LaneId, (r: RescueResult | null) => void>();
 const usedSeeds = new Set<number>();
 let rescueChain: Promise<void> = Promise.resolve();
+let runEpoch = 0;
 
 export interface RescueResult { pick: Pick; value?: string; rule?: RuleId | 'other'; ruleText?: string }
 
 class Aborted extends Error { constructor() { super('aborted'); } }
 const check = (sig: AbortSignal) => { if (sig.aborted) throw new Aborted(); };
+
+/** Release local waits promptly even if an iframe or server response arrives later. */
+function untilAbort<T>(work: Promise<T>, sig: AbortSignal): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const abort = () => { sig.removeEventListener('abort', abort); reject(new Aborted()); };
+    sig.addEventListener('abort', abort, { once: true });
+    work.then((v) => { sig.removeEventListener('abort', abort); if (sig.aborted) reject(new Aborted()); else resolve(v); }, (e) => { sig.removeEventListener('abort', abort); reject(e); });
+    if (sig.aborted) abort();
+  });
+}
 
 export function labelsFromSnapshot(snapshot: string): Record<string, string> {
   const out: Record<string, string> = {};
@@ -59,7 +70,7 @@ async function finish(runId: string, lane: LaneId, taskId: string, finalAction: 
     // A run that ended on a house-rule violation shows a violation verdict, not "stuck" (the judge's stuck flag wins server-side).
     if (!finalAction && fallback.status === 'violation' && v.status === 'stuck') return { ...v, status: 'violation', reason: fallback.reason, violations: [...new Set([...v.violations, ...fallback.violations])].sort() as RuleId[] };
     return v;
-  } catch { return fallback; }
+  } catch { return finalAction ? { status: 'failed', correct: false, reason: 'Run verification unavailable. Try again.', violations: state?.violations ?? [] } : fallback; }
 }
 
 function stamp(lane: LaneId, v: Verdict) {
@@ -70,6 +81,7 @@ function stamp(lane: LaneId, v: Verdict) {
 }
 
 async function runLane(lane: LaneId, sig: AbortSignal) {
+  if (sig.aborted) return;
   const st = S();
   const task = getTask(st.taskId);
   const runId = `run_${nanoid(10)}`;
@@ -80,6 +92,7 @@ async function runLane(lane: LaneId, sig: AbortSignal) {
     for (let stepIdx = 0; stepIdx <= MAX_STEPS; stepIdx++) {
       check(sig);
       const snap = await bridge.snapshot(lane);
+      check(sig);
       state = snap.state;
       S().patchLane(lane, { layoutTag: snap.layoutTag, thinking: true });
       if (snap.layoutTag && snap.layoutTag !== S().layoutTag) S().set({ layoutTag: snap.layoutTag, layoutFlash: S().layoutFlash + 1 });
@@ -106,6 +119,7 @@ async function runLane(lane: LaneId, sig: AbortSignal) {
         const v = await finish(runId, lane, task.id, res.action, state, {
           status: res.action.type === 'done' ? 'passed' : 'bug_reported', correct: true, reason: res.action.reason, violations: state?.violations ?? [],
         });
+        check(sig);
         if (res.action.type === 'report_bug') {
           S().patchLane(lane, {
             bug: {
@@ -132,7 +146,9 @@ async function runLane(lane: LaneId, sig: AbortSignal) {
       if (detectStuck(history, before, after, MAX_STEPS)) {
         // Only open-model lanes are rescued live: their rescues train the adapter. GPT/ICL end with the verdict.
         if (S().mode !== 'live' || lane === 'closed' || lane === 'icl') {
-          stamp(lane, await finish(runId, lane, task.id, null, state, { status: newRule ? 'violation' : 'stuck', correct: false, reason: newRule ? `Broke house rule ${newRule}` : 'Agent got stuck', violations: state.violations }));
+          const v = await finish(runId, lane, task.id, null, state, { status: newRule ? 'violation' : 'stuck', correct: false, reason: newRule ? `Broke house rule ${newRule}` : 'Agent got stuck', violations: state.violations });
+          check(sig);
+          stamp(lane, v);
           return;
         }
         // Live: ask a human. One rescue at a time — other stuck lanes queue behind it.
@@ -140,28 +156,37 @@ async function runLane(lane: LaneId, sig: AbortSignal) {
         let release: () => void = () => {};
         rescueChain = new Promise<void>((r) => { release = r; });
         S().patchLane(lane, { rescueQueued: true });
-        try { await Promise.race([prevRescue, new Promise((r) => sig.addEventListener('abort', r, { once: true }))]); } finally { S().patchLane(lane, { rescueQueued: false }); }
-        if (sig.aborted) { release(); throw new Aborted(); }
-        // The human teaches the decision the model got wrong, so put the shop back on the page *before* the bad action
-        // (e.g. the upsell modal is open again and "Not now" can be picked). The violation stays in the step log.
-        if (newRule && preAct) {
-          try { state = (await bridge.restore(lane, preAct)).state; } catch { /* keep current page */ }
+        let rescue: RescueResult | null = null;
+        try {
+          await untilAbort(prevRescue, sig);
+          check(sig);
+          S().patchLane(lane, { rescueQueued: false });
+          // The human teaches the decision the model got wrong, so put the shop back on the page *before* the bad action
+          // (e.g. the upsell modal is open again and "Not now" can be picked). The violation stays in the step log.
+          if (newRule && preAct) {
+            try { state = (await bridge.restore(lane, preAct)).state; } catch { /* keep current page */ }
+          }
+          check(sig);
+          S().patchLane(lane, { status: 'rescue' });
+          S().set({ rescue: { lane, stepId: res.stepId, badAction: res.action, badLabel: entry.label, autoRule: newRule, rule: newRule, otherText: '', value: '' } });
+          bridge.highlight(lane, true);
+          rescue = await untilAbort(new Promise<RescueResult | null>((resolve) => { rescueWaiters.set(lane, resolve); }), sig);
+        } finally {
+          release();
+          // A newer run may already own this lane and its rescue waiter.
+          if (S().lanes[lane].runId === runId) {
+            rescueWaiters.delete(lane);
+            bridge.highlight(lane, false);
+            S().patchLane(lane, { rescueQueued: false });
+            if (S().rescue?.lane === lane) S().set({ rescue: null });
+          }
         }
-        S().patchLane(lane, { status: 'rescue' });
-        S().set({ rescue: { lane, stepId: res.stepId, badAction: res.action, badLabel: entry.label, autoRule: newRule, rule: newRule, otherText: '', value: '' } });
-        bridge.highlight(lane, true);
-        const rescue = await new Promise<RescueResult | null>((resolve) => {
-          rescueWaiters.set(lane, resolve);
-          sig.addEventListener('abort', () => resolve(null), { once: true });
-        });
-        rescueWaiters.delete(lane);
-        release();
-        bridge.highlight(lane, false);
-        if (S().rescue?.lane === lane) S().set({ rescue: null });
         check(sig);
         if (!rescue) {
           const vs = newRule && !state.violations.includes(newRule) ? [...state.violations, newRule] : state.violations; // pre-violation state was restored
-          stamp(lane, await finish(runId, lane, task.id, null, state, { status: newRule ? 'violation' : 'stuck', correct: false, reason: newRule ? `Broke house rule ${newRule} · rescue skipped` : 'Stuck · rescue skipped', violations: vs }));
+          const v = await finish(runId, lane, task.id, null, state, { status: newRule ? 'violation' : 'stuck', correct: false, reason: newRule ? `Broke house rule ${newRule} · rescue skipped` : 'Stuck · rescue skipped', violations: vs });
+          check(sig);
+          stamp(lane, v);
           return;
         }
         S().patchLane(lane, { status: 'running', flash: null });
@@ -171,13 +196,17 @@ async function runLane(lane: LaneId, sig: AbortSignal) {
         };
         void submitCorrection(lane, res.stepId, res.action, entry.label, good, rescue);
         const applied = await bridge.apply(lane, rescue.pick.semKey, rescue.value || undefined);
+        check(sig);
         state = applied.state;
         history.push({ action: good, result: applied.result });
         S().patchLane(lane, (l) => ({ steps: [...l.steps, { idx: stepIdx, action: good, label: rescue.pick.label, result: applied.result, latencyMs: 0, human: true }] }));
       }
     }
-    stamp(lane, await finish(runId, lane, task.id, null, state, { status: 'stuck', correct: false, reason: `Step budget (${MAX_STEPS}) exceeded`, violations: state?.violations ?? [] }));
+    const v = await finish(runId, lane, task.id, null, state, { status: 'stuck', correct: false, reason: `Step budget (${MAX_STEPS}) exceeded`, violations: state?.violations ?? [] });
+    check(sig);
+    stamp(lane, v);
   } catch (e) {
+    if (S().lanes[lane].runId !== runId) return;
     if (e instanceof Aborted || sig.aborted) { S().patchLane(lane, { status: S().lanes[lane].verdict ? 'done' : 'idle', thinking: false }); return; }
     S().patchLane(lane, { status: 'done', thinking: false, error: e instanceof Error ? e.message : String(e) });
     stamp(lane, { status: 'failed', correct: false, reason: e instanceof Error ? e.message.slice(0, 90) : 'Lane error', violations: [] });
@@ -199,7 +228,9 @@ async function submitCorrection(lane: LaneId, stepId: string, bad: AgentAction, 
   try {
     const out = await api<{ correctionId: string; augmented: number | unknown[]; semKey?: string | null }>('/api/corrections', { stepId, goodAction: good, rule, note });
     const aug = Array.isArray(out.augmented) ? out.augmented.length : Number(out.augmented) || 0;
-    patchCorrection(id, { status: 'sent', augmented: aug });
+    // POST acknowledges persistence. Delivery runs after the response and can still fail.
+    patchCorrection(id, { serverId: out.correctionId, status: 'queued', augmented: aug });
+    void watchCorrection(id, out.correctionId);
     const c = S().counts;
     S().set({ counts: { rescues: c.rescues + 1, examples: c.examples + 1 + aug, sinceVersion: c.sinceVersion + 1 + aug } });
     const t = S().training;
@@ -213,6 +244,40 @@ export function patchCorrection(id: string, p: Partial<CorrectionView>) {
   S().set({ corrections: S().corrections.map((c) => (c.id === id ? { ...c, ...p } : c)) });
 }
 
+async function watchCorrection(localId: string, serverId: string) {
+  // A slow or unavailable provider leaves an honest queued card; never infer delivery from elapsed time.
+  for (let attempt = 0; attempt < 15; attempt++) {
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+    const view = S().corrections.find((c) => c.id === localId);
+    if (!view || view.status !== 'queued') return;
+    const row = (await correctionStatuses())?.find((c) => c.id === serverId);
+    if (row && (row.status === 'sent' || row.status === 'failed' || row.status === 'trained')) {
+      patchCorrection(localId, { status: row.status });
+      return;
+    }
+  }
+}
+
+async function correctionStatuses(): Promise<CorrectionRow[] | null> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 5000);
+  try {
+    const rows = await untilAbort(api<CorrectionRow[]>('/api/corrections?source=human&limit=1000', undefined, controller.signal), controller.signal);
+    return Array.isArray(rows) ? rows : null;
+  }
+  catch { return null; }
+  finally { clearTimeout(timeout); }
+}
+
+async function reconcileCorrections() {
+  const rows = await correctionStatuses();
+  if (!rows) return;
+  S().set({ corrections: S().corrections.map((c) => {
+    const row = rows.find((r) => r.id === (c.serverId ?? c.id));
+    return row && (row.status === 'queued' || row.status === 'sent' || row.status === 'failed' || row.status === 'trained') ? { ...c, status: row.status } : c;
+  }) });
+}
+
 /** Called by RescueOverlay. */
 export function resolveRescue(lane: LaneId, r: RescueResult | null) {
   rescueWaiters.get(lane)?.(r);
@@ -221,12 +286,15 @@ export function resolveRescue(lane: LaneId, r: RescueResult | null) {
 // ───────────────────────── Mission actions (hotkeys) ─────────────────────────
 
 export function stopAll() {
+  runEpoch++;
+  stopReplay();
   controllers.forEach((c) => c.abort());
   controllers.clear();
   rescueWaiters.forEach((w) => w(null));
   rescueChain = Promise.resolve();
-  S().activeLanes().forEach((l) => bridge.highlight(l, false));
-  S().set({ running: false, rescue: null });
+  rescueWaiters.clear();
+  S().activeLanes().forEach((l) => { bridge.cancel(l); bridge.highlight(l, false); S().patchLane(l, { rescueQueued: false, thinking: false, status: S().lanes[l].verdict ? 'done' : 'idle' }); });
+  S().set({ running: false, rescue: null, mode: 'live' });
 }
 
 function resetFrames() {
@@ -236,23 +304,29 @@ function resetFrames() {
 
 export async function runAll() {
   stopAll();
+  const epoch = runEpoch;
   const s = S();
   s.resetLanes();
   resetFrames();
   s.set({ running: true });
   const lanes = s.activeLanes();
+  const owned = new Map(lanes.map((lane) => { const c = new AbortController(); controllers.set(lane, c); return [lane, c] as const; }));
   const task = getTask(s.taskId);
   recordEvent({ kind: 'scene', sceneId: s.taskId, title: task.id, caption: task.goal, taskId: task.id, goal: task.goal, seed: s.seed, versionIndex: s.versionIndex, bugs: s.bugs, layoutTag: s.layoutTag,
     lanes: lanes.map((l) => ({ lane: l, label: LANES[l].label, versionLabel: l === 'adapted' ? s.adapted.label : l === 'base' ? 'v1' : '' })) });
   await new Promise((r) => setTimeout(r, 200));
+  if (epoch !== runEpoch) return;
   await Promise.all(lanes.map(async (lane) => {
-    const c = new AbortController();
-    controllers.set(lane, c);
-    try { await waitReady(lane); } catch (e) { S().patchLane(lane, { error: String(e) }); }
-    await runLane(lane, c.signal);
+    const c = owned.get(lane)!;
+    try {
+      await untilAbort(waitReady(lane, 20, c.signal), c.signal);
+      check(c.signal);
+      await runLane(lane, c.signal);
+    } catch (e) {
+      if (!c.signal.aborted && epoch === runEpoch) S().patchLane(lane, { error: String(e), status: 'done' });
+    } finally { if (controllers.get(lane) === c) controllers.delete(lane); }
   }));
-  if (lanes.every((l) => !controllers.get(l)?.signal.aborted)) S().set({ running: false });
-  void loadMetrics();
+  if (epoch === runEpoch) { S().set({ running: false }); void loadMetrics(); }
 }
 
 export function nextUnseenSeed(): number {
@@ -325,32 +399,39 @@ interface StatusRes { phase: 'collecting' | 'training' | 'evaluating' | 'promote
 let polling = false;
 
 export async function trainNow() {
+  if (S().mode === 'replay') stopAll();
   const t = S().training;
   if (polling || t.phase === 'training' || t.phase === 'evaluating') return;
   const startedAt = Date.now();
   S().set({ training: { phase: 'training', progress: 0, startedAt } });
-  let jobId: string | null = null;
-  try { jobId = (await api<{ jobId: string | null }>('/api/refresh', {})).jobId; } catch { /* automatic mode */ }
-  S().set({ training: { ...S().training, jobId } });
   polling = true;
   try {
+    const { jobId, versionId } = await api<{ jobId: string | null; versionId?: string }>('/api/refresh', {});
+    const pollId = jobId ?? versionId;
+    S().set({ training: { ...S().training, jobId: pollId ?? null } });
+    let failures = 0;
     for (let i = 0; i < 900; i++) {
       await new Promise((r) => setTimeout(r, 1000));
-      const st = await apiSafe<StatusRes>(`/api/refresh/status${jobId ? `?jobId=${encodeURIComponent(jobId)}` : ''}`);
-      if (!st) continue;
-      if (st.phase !== 'collecting') recordEvent({ kind: 'version', phase: st.phase, label: st.version?.label ?? '…', progress: st.progress ?? (st.phase === 'promoted' || st.phase === 'held_back' ? 1 : 0.5), examples: st.version?.examples ?? undefined, headline: st.reason });
-      if (st.phase === 'training' || st.phase === 'collecting') S().set({ training: { ...S().training, phase: 'training', progress: st.progress ?? Math.min(0.95, (Date.now() - startedAt) / 120000) } });
+      let st: StatusRes;
+      try { st = await api<StatusRes>(`/api/refresh/status${pollId ? `?jobId=${encodeURIComponent(pollId)}` : ''}`); failures = 0; }
+      catch (e) { if (++failures >= 5) throw e; continue; }
+      if (st.phase === 'collecting') throw new Error('No active training job was found. Try Train now again.');
+      recordEvent({ kind: 'version', phase: st.phase, label: st.version?.label ?? '…', progress: st.progress ?? (st.phase === 'promoted' || st.phase === 'held_back' ? 1 : 0.5), examples: st.version?.examples ?? undefined, headline: st.reason });
+      if (st.phase === 'training') S().set({ training: { ...S().training, phase: 'training', progress: st.progress ?? 0 } });
       else if (st.phase === 'evaluating') S().set({ training: { ...S().training, phase: 'evaluating', progress: st.progress ?? 0.5 } });
       else if (st.phase === 'held_back') {
         S().set({ training: { ...S().training, phase: 'held_back', progress: 1, reason: st.reason ?? st.version?.heldBackReason ?? 'regression on bug detection' } });
-        break;
+        return;
       } else if (st.phase === 'promoted') {
         const secs = Math.round((Date.now() - startedAt) / 1000);
         S().set({ training: { ...S().training, phase: 'evaluating', progress: 1 } });
         await promote(st.version, secs);
-        break;
+        return;
       }
     }
+    throw new Error('Training status timed out. Try Train now again.');
+  } catch (e) {
+    S().set({ training: { phase: 'held_back', progress: 0, reason: `Refresh failed: ${e instanceof Error ? e.message : String(e)}` } });
   } finally { polling = false; }
 }
 
@@ -362,15 +443,16 @@ async function promote(v: StatusRes['version'], trainSeconds: number) {
     if (pick) next = pick;
   }
   const s = S();
-  const label = next?.label ?? `v${(parseInt(s.adapted.label.replace(/\D/g, ''), 10) || 0) + 1}`;
+  if (!next?.versionId) throw new Error('Promoted version metadata is unavailable. Reload versions before retrying.');
+  const label = next.label;
   s.set({
     prevAdaptedLabel: s.adapted.label,
     adapted: { versionId: next?.versionId, label, examples: next?.examples ?? s.counts.examples, createdAt: next?.createdAt },
     flipKey: s.flipKey + 1,
     training: { phase: 'promoted', progress: 1, trainSeconds },
-    corrections: s.corrections.map((c) => (c.status === 'sent' || c.status === 'queued' ? { ...c, status: 'trained' } : c)),
     counts: { ...s.counts, sinceVersion: 0 },
   });
+  void reconcileCorrections();
   emit('burst', { lane: 'adapted' });
   void loadMetrics();
   setTimeout(() => { if (S().training.phase === 'promoted') S().set({ training: { ...S().training, phase: 'collecting', progress: 0 } }); }, 6000);
@@ -382,7 +464,7 @@ interface CorrectionRow {
 }
 interface VersionLike { versionId?: string; id?: string; label: string; createdAt?: string | Date; examples?: number | null; status?: string; promoted?: boolean | null; heldBackReason?: string | null }
 function toAdapted(v: VersionLike) {
-  return { versionId: v.versionId ?? v.id ?? v.label, label: v.label, examples: v.examples ?? undefined, createdAt: v.createdAt ? String(v.createdAt) : undefined };
+  return { versionId: v.versionId ?? v.id, label: v.label, examples: v.examples ?? undefined, createdAt: v.createdAt ? String(v.createdAt) : undefined };
 }
 function latestPromoted(list: VersionLike[]) {
   const ok = list.filter((v) => v.promoted !== false && (v.status === undefined || v.status === 'ready'));

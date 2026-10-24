@@ -24,14 +24,17 @@ beforeAll(async () => {
       else { res.statusCode = 404; res.end('{}'); }
     });
   });
-  await new Promise<void>((r) => server.listen(0, '127.0.0.1', () => r()));
+  await new Promise<void>((resolve, reject) => {
+    server.once('error', reject);
+    server.listen(0, '127.0.0.1', () => { server.removeListener('error', reject); resolve(); });
+  });
   base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
 });
 afterAll(() => { server.close(); });
 
 describe('real Mubit client', () => {
   it('routes chat with version suffix, auth, provider header, request id', async () => {
-    const c = readConfig({ MUBIT_ENABLED: 'true', MUBIT_BASE_URL: `${base}/v1`, MUBIT_API_KEY: 'k_test', MUBIT_PROVIDER_KEY_HEADER: 'x-provider-key', OPENAI_API_KEY: 'sk_test', MUBIT_FEEDBACK_URL: `${base}/feedback`, MUBIT_VERSIONS_URL: `${base}/versions` });
+    const c = readConfig({ MUBIT_ENABLED: 'true', MUBIT_BASE_URL: `${base}/v1`, MUBIT_API_KEY: 'k_test', MUBIT_REQUEST_ID_HEADER: 'x-request-id', MUBIT_PROVIDER_KEY_HEADER: 'x-provider-key', OPENAI_API_KEY: 'sk_test', MUBIT_FEEDBACK_URL: `${base}/feedback`, MUBIT_VERSIONS_URL: `${base}/versions` });
     const m = createRealClient(c);
     const r = await m.chat({ model: 'open:llama', versionId: 'mv2', messages: [{ role: 'user', content: 'hi' }], jsonMode: true, seed: 7 });
     expect(r).toMatchObject({ text: '{"type":"done","reason":"ok"}', callId: 'req_123', usage: { in: 100, out: 9 } });

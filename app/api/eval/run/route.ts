@@ -20,7 +20,7 @@ export async function POST(req: Request) {
       if (!v) return fail(`unknown version ${p.data.versionId}`, 404);
       versionId = v.id; label = v.label; examples = v.examples ?? 0;
     }
-    const lane = p.data.lane ?? (versionId ? ((examples ?? 0) === 0 ? 'base' : 'adapted') : 'base');
+    const lane = p.data.lane ?? (versionId && versionId !== 'v1' ? 'adapted' : 'base');
     const config: EvalConfig = { lane, versionId, suite: p.data.suite, label, examples };
     const ev = await startEval(config);
     return ok({ evalId: ev.id, total: ev.total });

@@ -4,8 +4,12 @@ import type { ScoreboardRow } from '@/lib/db/queries';
 
 export interface EvalMetrics extends ScoreboardRow {
   healthyRuns: number; bugRuns: number; passed: number; bugsReported: number;
+  evaluationErrors: number;
   p95LatencyMs: number | null; totalCostUsd: number | null; suite?: string; label?: string; examples?: number;
 }
+
+/** Persisted on failed trials so infrastructure failures cannot be mistaken for model results. */
+export const EVALUATION_ERROR_PREFIX = 'Evaluation run failed: ';
 
 export type MetricKey = 'verifiedSuccess' | 'bugRecall' | 'falseAlarms' | 'violationsPerRun' | 'rescuesPer10' | 'stepsPerRun'
   | 'p50LatencyMs' | 'p95LatencyMs' | 'costPerRunUsd' | 'promptChars';
@@ -55,6 +59,7 @@ export function computeMetrics(lane: string, versionId: string | null, runs: Run
   const needRescue = done.filter((r) => r.status === 'stuck' || r.status === 'violation').length;
   return {
     lane, versionId, runs: done.length, healthyRuns: healthy.length, bugRuns: buggy.length, passed, bugsReported: reported,
+    evaluationErrors: done.filter((r) => r.status === 'failed' && r.reason?.startsWith(EVALUATION_ERROR_PREFIX)).length,
     verifiedSuccess: healthy.length ? passed / healthy.length : null,
     bugRecall: buggy.length ? reported / buggy.length : null,
     falseAlarms: healthy.filter((r) => r.status === 'bug_reported' || /false alarm/i.test(r.reason ?? '')).length,

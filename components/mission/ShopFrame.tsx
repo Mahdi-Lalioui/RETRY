@@ -1,5 +1,5 @@
 'use client';
-import { useLayoutEffect, useRef, useState } from 'react';
+import { useCallback, useLayoutEffect, useRef, useState } from 'react';
 import type { LaneId } from '@/lib/agent/types';
 import { registerFrame } from '@/lib/store/frames';
 import { useMission } from '@/lib/store/mission';
@@ -10,6 +10,9 @@ const H = 800;
 
 /** The lane's customer website: a 1280×800 iframe scaled with a transform to fit, plus the ghost cursor. */
 export function ShopFrame({ lane, children }: { lane: LaneId; children?: React.ReactNode }) {
+  // React detaches changed callback refs on every render. Keep registration stable so
+  // lane updates do not look like an unmount and cancel requests still in flight.
+  const register = useCallback((el: HTMLIFrameElement | null) => registerFrame(lane, el), [lane]);
   const box = useRef<HTMLDivElement>(null);
   const geom = useRef({ scale: 0.3, ox: 0, oy: 0 });
   const [g, setG] = useState({ scale: 0, ox: 0, oy: 0, w: 0, h: 0 });
@@ -46,7 +49,7 @@ export function ShopFrame({ lane, children }: { lane: LaneId; children?: React.R
         data-lane-frame={lane}
       >
         <iframe
-          ref={(el) => registerFrame(lane, el)}
+          ref={register}
           src={src}
           title={`${lane} lane shop`}
           className="absolute left-0 top-0 origin-top-left border-0"

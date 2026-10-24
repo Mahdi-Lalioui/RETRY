@@ -1,6 +1,7 @@
 // plan §13 — run the 48-run held-out suite from the CLI and print the scoreboard.
 // Usage: npm run eval                      → bootstrap (if needed) + print every lane/version
 //        npm run eval -- --lane base       → one fresh eval for a lane (optionally --version <id|label>)
+import './env';
 import { ensureBootstrap } from '@/lib/train/bootstrap';
 import { runEval, finalMetrics } from '@/lib/eval/runner';
 import { METRICS, type EvalMetrics } from '@/lib/eval/metrics';

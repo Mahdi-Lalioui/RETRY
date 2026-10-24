@@ -31,6 +31,8 @@ interface LogLine { k: number; text: string; tone: 'ok' | 'bad' | 'rescue' | 'mu
 export function RescueQueue({ onCorrection }: { onCorrection: () => void }) {
   const [seed, setSeed] = useState(() => 1 + Math.floor((Date.now() / 1000) % 200));
   const [running, setRunning] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const submissionInFlight = useRef(false);
   const [stuck, setStuck] = useState<Stuck | null>(null);
   const [pick, setPick] = useState<Pick | null>(null);
   const [value, setValue] = useState('');
@@ -41,6 +43,7 @@ export function RescueQueue({ onCorrection }: { onCorrection: () => void }) {
   const [stats, setStats] = useState({ rescues: 0, runs: 0, started: Date.now(), times: [] as number[] });
   const frame = useRef<ShopFrame | null>(null);
   const stop = useRef(false);
+  const controller = useRef<AbortController | null>(null);
   const resolveRescue = useRef<((a: AgentAction | null) => void) | null>(null);
   const stuckAt = useRef(0);
   const k = useRef(0);
@@ -51,18 +54,29 @@ export function RescueQueue({ onCorrection }: { onCorrection: () => void }) {
 
   const waitRescue = () => new Promise<AgentAction | null>((r) => { resolveRescue.current = r; });
 
-  const runOne = useCallback(async (sd: number) => {
+  const stopQueue = useCallback(() => {
+    stop.current = true;
+    controller.current?.abort();
+    resolveRescue.current?.(null); resolveRescue.current = null;
+    frame.current?.cancel(); frame.current?.highlight(false);
+  }, []);
+  useEffect(() => stopQueue, [stopQueue]);
+
+  const runOne = useCallback(async (sd: number, signal: AbortSignal) => {
     const f = frame.current; if (!f) return;
     const t = taskFor(sd); const b = bugsFor(sd, t);
-    await f.boot(sd, 1, b);
+    await f.boot(sd, 1, b, t.id, signal);
+    if (signal.aborted) return;
     const runId = `rq_${sd}_${Date.now().toString(36)}`;
     const history: HistoryItem[] = [];
     push(`seed ${sd} · ${t.id} ${t.goal}${b.length ? ` · bug ${b[0]}` : ''}`, 'muted');
-    for (let idx = 0; idx < MAX_STEPS && !stop.current; idx++) {
+    for (let idx = 0; idx < MAX_STEPS && !signal.aborted; idx++) {
       const snap = await f.snapshot();
+      if (signal.aborted) return;
       const res = await fetch('/api/agent/step', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({
         runId, lane: 'base', taskId: t.id, goal: t.goal, snapshot: snap.snapshot, history, modelRef: MODEL_REF, stepIdx: idx, state: snap.state, seed: sd, bugs: b,
-      }) }).then((r) => r.json());
+      }), signal }).then((r) => r.json());
+      if (signal.aborted) return;
       if (!res.ok) { push(`step failed: ${res.error}`, 'bad'); return; }
       let action: AgentAction = res.data.action;
       const p = detectRescue(t, snap.state, action, history);
@@ -75,12 +89,14 @@ export function RescueQueue({ onCorrection }: { onCorrection: () => void }) {
         const good = await waitRescue();
         f.highlight(false);
         setStuck(null);
+        if (signal.aborted) return;
         if (!good) { push('skipped', 'muted'); return; }
         action = good;
         if (good.type === 'report_bug' || good.type === 'done') { push(`✓ rescued: ${actionText(good)}`, 'rescue'); return; }
         const sem = good.target ? resolveTarget(snap.state, good.target) : undefined;
         if (sem) {
           const r = await f.apply(sem, good.value);
+          if (signal.aborted) return;
           history.push({ action: good, result: r.result });
         }
         push(`✓ rescued: ${actionText(good)}`, 'rescue');
@@ -88,24 +104,36 @@ export function RescueQueue({ onCorrection }: { onCorrection: () => void }) {
       }
       if (action.type === 'done' || action.type === 'report_bug') { push(`${action.type === 'done' ? '✓ done' : '⚑ bug reported'} — ${action.reason}`, 'ok'); return; }
       const r = await f.act(action);
+      if (signal.aborted) return;
       history.push({ action, result: r.result });
       push(`${actionText(action)} → ${r.result}`, r.result === 'ok' ? 'ok' : 'muted');
     }
   }, []);
 
   const start = async () => {
+    if (controller.current && !controller.current.signal.aborted) return;
+    const current = new AbortController();
+    controller.current = current;
     stop.current = false; setRunning(true);
     let sd = seed;
     try {
-      while (!stop.current) {
-        await runOne(sd);
+      while (!current.signal.aborted) {
+        await runOne(sd, current.signal);
+        if (current.signal.aborted) break;
         setDone((d) => d + 1); setStats((s) => ({ ...s, runs: s.runs + 1 }));
         sd = sd >= 200 ? 1 : sd + 1;
         if (!stop.current) setSeed(sd);
         await new Promise((r) => setTimeout(r, 600));
       }
-    } catch (e) { push(`error: ${(e as Error).message}`, 'bad'); }
-    setRunning(false);
+    } catch (e) { if (!current.signal.aborted) push(`error: ${(e as Error).message}`, 'bad'); }
+    finally {
+      if (controller.current === current) {
+        controller.current = null;
+        resolveRescue.current = null;
+        frame.current?.highlight(false);
+        setStuck(null); setRunning(false);
+      }
+    }
   };
 
   // pick messages from the iframe (highlight mode)
@@ -116,20 +144,27 @@ export function RescueQueue({ onCorrection }: { onCorrection: () => void }) {
   });
 
   const submit = async (override?: AgentAction) => {
-    if (!stuck) return;
+    if (!stuck || submissionInFlight.current || controller.current?.signal.aborted) return;
     let good: AgentAction | null = override ?? null;
     if (!good && pick) {
       const type = pick.role === 'textbox' ? 'type' : pick.role === 'select' ? 'select' : 'click';
       good = { type, target: pick.id, ...(type !== 'click' ? { value } : {}), reason: `Human rescue${rule && rule !== 'Other' ? `: ${rule}` : ''}` };
     }
     if (!good) return;
-    const r = await fetch('/api/corrections', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ stepId: stuck.stepId, goodAction: good, rule }) }).then((x) => x.json());
-    if (r.ok) {
+    if ((good.type === 'type' || good.type === 'select') && !good.value?.trim()) return;
+    submissionInFlight.current = true;
+    setSubmitting(true);
+    const current = controller.current;
+    try {
+      const r = await fetch('/api/corrections', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ stepId: stuck.stepId, goodAction: good, rule }), signal: current?.signal }).then((x) => x.json());
+      if (current !== controller.current || current?.signal.aborted) return;
+      if (!r.ok) throw new Error(r.error ?? 'request failed');
       setStats((s) => ({ ...s, rescues: s.rescues + 1, times: [...s.times, Date.now() - stuckAt.current] }));
-      push(`→ correction ${r.data.correctionId.slice(-6)} · ×${r.data.augmented} augmented · sent to Mubit`, 'rescue');
+      push(`→ correction ${r.data.correctionId.slice(-6)} · ×${r.data.augmented} augmented · queued for Mubit`, 'rescue');
       onCorrection();
-    } else push(`correction failed: ${r.error}`, 'bad');
-    resolveRescue.current?.(good); resolveRescue.current = null;
+      resolveRescue.current?.(good); resolveRescue.current = null;
+    } catch (e) { if (!current?.signal.aborted) push(`correction failed: ${(e as Error).message}`, 'bad'); }
+    finally { submissionInFlight.current = false; setSubmitting(false); }
   };
 
   useEffect(() => {
@@ -158,7 +193,7 @@ export function RescueQueue({ onCorrection }: { onCorrection: () => void }) {
           {bugs[0] && <span className="rounded border border-[#F43F5E55] px-1.5 text-[11px] text-[#FDA4AF]">bug: {BUGS[bugs[0]].title}</span>}
           <div className="ml-auto flex gap-2">
             {!running ? <button className="btn btn-learn" onClick={() => void start()}>▶ Start queue</button>
-              : <button className="btn" onClick={() => { stop.current = true; resolveRescue.current?.(null); }}>⏸ Stop</button>}
+              : <button className="btn" onClick={stopQueue}>⏸ Stop</button>}
           </div>
         </div>
         <div className="relative">
@@ -176,11 +211,11 @@ export function RescueQueue({ onCorrection }: { onCorrection: () => void }) {
               </div>
               <div className="mt-3 flex flex-wrap items-center gap-4">
                 <Diff bad={stuck.bad} good={pick ? { type: pick.role === 'textbox' ? 'type' : 'click', target: pick.id, value: value || undefined, reason: '' } : { type: 'click', target: '?', reason: '' }} labelGood={pick?.label} />
-                {pick?.role === 'textbox' && <input autoFocus className="input mono w-[260px]" placeholder="value to type" value={value} onChange={(e) => setValue(e.target.value)} />}
+                {(pick?.role === 'textbox' || pick?.role === 'select') && <input autoFocus className="input mono w-[260px]" placeholder={pick.role === 'select' ? 'value to select (1–5)' : 'value to type'} value={value} onChange={(e) => setValue(e.target.value)} />}
                 {stuck.point.goodAction.type === 'report_bug' && (
                   <div className="flex items-center gap-2">
                     <input className="input w-[300px]" placeholder="bug evidence (e.g. total shows £NaN)" value={value} onChange={(e) => setValue(e.target.value)} />
-                    <button className="btn" style={{ borderColor: '#F43F5E88', color: '#FDA4AF' }} onClick={() => void submit({ type: 'report_bug', reason: value || stuck.point.goodAction.reason })}>⚑ Report bug</button>
+                    <button disabled={submitting} className="btn" style={{ borderColor: '#F43F5E88', color: '#FDA4AF' }} onClick={() => void submit({ type: 'report_bug', reason: value || stuck.point.goodAction.reason })}>⚑ Report bug</button>
                   </div>
                 )}
               </div>
@@ -190,7 +225,7 @@ export function RescueQueue({ onCorrection }: { onCorrection: () => void }) {
                   <button key={r} onClick={() => setRule(r)} className={`rounded-md border px-2 py-0.5 mono text-[11px] ${rule === r ? 'border-[#F59E0B] bg-[#F59E0B22] text-[#FCD34D]' : 'border-transparent muted hover:text-[var(--rx-text)]'}`}>{r}</button>
                 ))}
                 <button className="ml-auto text-[11px] muted underline-offset-2 hover:underline" onClick={() => setHint((h) => !h)}>{hint ? `solver suggests: ${actionText(stuck.point.goodAction)}` : 'show hint'}</button>
-                <button className="btn btn-amber ml-2" disabled={!pick} onClick={() => void submit()}>Teach RETRY ↵</button>
+                <button className="btn btn-amber ml-2" disabled={!pick || submitting || ((pick.role === 'textbox' || pick.role === 'select') && !value.trim())} onClick={() => void submit()}>Teach RETRY ↵</button>
               </div>
             </motion.div>
           )}

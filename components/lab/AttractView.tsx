@@ -48,7 +48,6 @@ export function AttractView() {
       }
     })();
     return () => { cancelled = true; };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   async function playTurn(n: number, cancelled: () => boolean) {
@@ -63,7 +62,7 @@ export function AttractView() {
     const t: Turn = { seed, taskId, goal: r.data.task.goal, bugs, version: r.data.version, mode: r.data.mode, closed: r.data.closed, adapted: r.data.adapted };
     setTurn(t);
     setLive({ closed: { step: 0, latency: [], cost: 0 }, adapted: { step: 0, latency: [], cost: 0 } });
-    await Promise.all((['closed', 'adapted'] as const).map((k) => frames.current[k]?.boot(seed, versionIndex, bugs)));
+    await Promise.all((['closed', 'adapted'] as const).map((k) => frames.current[k]?.boot(seed, versionIndex, bugs, taskId)));
     setCaption({ big: `Unseen layout · RETRY ${t.version} vs GPT`, small: `${t.taskId} · ${t.goal}${bugs[0] ? `  ·  checkout secretly broken: ${BUGS[bugs[0]].title}` : ''}` });
     await sleep(1500);
     await Promise.all((['closed', 'adapted'] as const).map(async (k) => {

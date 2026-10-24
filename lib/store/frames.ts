@@ -8,7 +8,7 @@ export interface Pick { id: string; semKey: string; role: string; label: string 
 export interface CursorMsg { x: number; y: number; pressed?: boolean }
 
 const frames = new Map<LaneId, HTMLIFrameElement>();
-const pending = new Map<string, { resolve: (d: unknown) => void; timer: ReturnType<typeof setTimeout> }>();
+const pending = new Map<string, { lane: LaneId; resolve: (d: unknown) => void; reject: (e: Error) => void; timer: ReturnType<typeof setTimeout> }>();
 const cursorSubs = new Map<LaneId, Set<(c: CursorMsg) => void>>();
 const pickSubs = new Map<LaneId, Set<(p: Pick) => void>>();
 let listening = false;
@@ -26,15 +26,16 @@ function ensureListener() {
     if (e.origin !== window.location.origin) return;
     const d = e.data as { type?: string; reqId?: string } & Record<string, unknown>;
     if (!d || typeof d.type !== 'string' || !d.type.startsWith('retry:')) return;
+    const lane = laneOf(e.source);
+    if (!lane) return;
     if (d.reqId && pending.has(d.reqId)) {
       const p = pending.get(d.reqId)!;
+      if (p.lane !== lane) return;
       clearTimeout(p.timer);
       pending.delete(d.reqId);
       p.resolve(d);
       return;
     }
-    const lane = laneOf(e.source);
-    if (!lane) return;
     if (d.type === 'retry:cursor') cursorSubs.get(lane)?.forEach((h) => h(d as unknown as CursorMsg));
     if (d.type === 'retry:pick') pickSubs.get(lane)?.forEach((h) => h(d as unknown as Pick));
   });
@@ -42,6 +43,7 @@ function ensureListener() {
 
 export function registerFrame(lane: LaneId, el: HTMLIFrameElement | null) {
   ensureListener();
+  if (frames.get(lane) && frames.get(lane) !== el) cancelPending(lane);
   if (el) frames.set(lane, el);
   else frames.delete(lane);
 }
@@ -60,9 +62,16 @@ function request<T>(lane: LaneId, msg: Record<string, unknown>, timeoutMs: numbe
       pending.delete(reqId);
       reject(new Error(`bridge timeout: ${String(msg.type)} on ${lane}`));
     }, timeoutMs);
-    pending.set(reqId, { resolve: resolve as (d: unknown) => void, timer });
+    pending.set(reqId, { lane, reject, resolve: resolve as (d: unknown) => void, timer });
     try { post(lane, { ...msg, reqId }); } catch (err) { clearTimeout(timer); pending.delete(reqId); reject(err); }
   });
+}
+
+function cancelPending(lane: LaneId) {
+  for (const [id, p] of pending) {
+    if (p.lane !== lane) continue;
+    clearTimeout(p.timer); pending.delete(id); p.reject(new Error(`bridge cancelled: ${lane}`));
+  }
 }
 
 export const bridge = {
@@ -72,6 +81,7 @@ export const bridge = {
   restore: (lane: LaneId, state: ShopState) => request<ActRes>(lane, { type: 'retry:restore', state }, 4000),
   highlight: (lane: LaneId, enabled: boolean) => { try { post(lane, { type: 'retry:highlight', enabled }); } catch { /* frame gone */ } },
   reset: (lane: LaneId, seed: number, versionIndex: number, bugs: BugId[], taskId?: string) => { try { post(lane, { type: 'retry:reset', seed, versionIndex, bugs, taskId }); } catch { /* frame gone */ } },
+  cancel: (lane: LaneId) => { cancelPending(lane); try { post(lane, { type: 'retry:cancel' }); } catch { /* frame gone */ } },
   hasFrame: (lane: LaneId) => frames.has(lane),
   onCursor(lane: LaneId, h: (c: CursorMsg) => void) {
     ensureListener();
@@ -88,10 +98,12 @@ export const bridge = {
 };
 
 /** Wait until a lane's iframe answers a snapshot (it may still be loading). */
-export async function waitReady(lane: LaneId, tries = 20): Promise<SnapshotRes> {
+export async function waitReady(lane: LaneId, tries = 20, signal?: AbortSignal): Promise<SnapshotRes> {
   let last: unknown;
   for (let i = 0; i < tries; i++) {
+    if (signal?.aborted) throw new Error('shop readiness cancelled');
     try { if (frames.has(lane)) return await request<SnapshotRes>(lane, { type: 'retry:snapshot' }, 1200); } catch (e) { last = e; }
+    if (signal?.aborted) throw new Error('shop readiness cancelled');
     await new Promise((r) => setTimeout(r, 250));
   }
   throw last instanceof Error ? last : new Error(`lane ${lane} not ready`);

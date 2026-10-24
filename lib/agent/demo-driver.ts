@@ -9,7 +9,7 @@ import type { EventInput } from '@/lib/demo/recorder';
 import { bridge } from '@/lib/store/frames';
 import { emit } from '@/lib/store/bus';
 import { play } from '@/lib/store/sfx';
-import { useMission, type CorrectionView } from '@/lib/store/mission';
+import { useMission, type CorrectionView, type MissionState } from '@/lib/store/mission';
 
 const S = () => useMission.getState();
 
@@ -22,6 +22,17 @@ function labelsFromSnapshot(snapshot: string): Record<string, string> {
 // ───────────── replay ─────────────
 let replay: Replay | null = null;
 let epoch = 0; // bumps on stop so in-flight bridge promises from a stopped replay are ignored
+let liveState: Partial<MissionState> | null = null;
+
+/** Background refresh/metrics responses belong to the live session while a recording is displayed. */
+export function liveMissionState(): MissionState {
+  const actual = S();
+  if (!liveState) return actual;
+  return { ...actual, ...liveState, set: (patch) => {
+    if (liveState) liveState = { ...liveState, ...patch };
+    else actual.set(patch);
+  } };
+}
 
 function onEvent(e: RecordingEvent, rec: Recording, my: number) {
   if (my !== epoch || S().mode !== 'replay') return;
@@ -78,6 +89,7 @@ function onEvent(e: RecordingEvent, rec: Recording, my: number) {
         id, lane: e.lane, rule: e.rule && e.rule !== 'BUG' ? e.rule : undefined,
         bad: { action: e.badAction ?? ({ type: 'click', reason: '' } as AgentAction) }, good: { action: e.goodAction },
         augmented: e.augmented, status: 'sent', landed: false, at: Date.now(),
+        source: e.source,
       };
       S().set({ corrections: [view, ...S().corrections].slice(0, 12) });
       emit('card', { id, lane: e.lane });
@@ -109,9 +121,15 @@ export async function startReplay(name = 'session-default') {
     return;
   }
   if (my !== epoch || S().mode !== 'replay') return;
+  const s = S();
+  liveState = {
+    adapted: s.adapted, prevAdaptedLabel: s.prevAdaptedLabel, flipKey: s.flipKey, training: s.training,
+    corrections: s.corrections, counts: s.counts, calls: s.calls, seed: s.seed, taskId: s.taskId,
+    versionIndex: s.versionIndex, bugs: s.bugs, layoutTag: s.layoutTag, iclOn: s.iclOn,
+  };
   const when = new Date(rec.recordedAt).toLocaleString('en-GB', { weekday: 'short', hour: '2-digit', minute: '2-digit' });
-  S().set({ replayLabel: rec.honestLabel, replayAt: when, replayTitle: rec.title, replayCaption: undefined });
-  replay = createReplay(rec, { onEvent: (e, r) => onEvent(e, r, my), onEnd: () => { if (my === epoch) S().set({ replayCaption: 'End of recording · press D for live' }); } });
+  S().set({ replayLabel: rec.honestLabel, replayAt: when, replayTitle: rec.title, replayCaption: undefined, running: true });
+  replay = createReplay(rec, { onEvent: (e, r) => onEvent(e, r, my), onEnd: () => { if (my === epoch) S().set({ replayCaption: 'End of recording · press D for live', running: false }); } });
   replay.play();
 }
 
@@ -119,6 +137,11 @@ export function stopReplay() {
   epoch++;
   replay?.stop();
   replay = null;
+  if (liveState) {
+    S().activeLanes().forEach((lane) => bridge.cancel(lane));
+    S().set({ ...liveState, running: false, replayLabel: undefined, replayCaption: undefined, replayTitle: undefined });
+    liveState = null;
+  }
 }
 
 // ───────────── recorder (Shift+R) ─────────────
@@ -134,6 +157,7 @@ export function recordEvent(e: EventInput) {
 
 export function toggleRecorder(): Recording | null {
   if (!recorder) {
+    if (S().mode === 'replay') return null;
     const mubit = S().health.mubit;
     recorder = createRecorder({ title: 'RETRY — live Mission Control session', source: 'live', mubitMode: mubit === 'ok' ? 'real' : 'mock', timing: 'real' });
     S().set({ recording: true });

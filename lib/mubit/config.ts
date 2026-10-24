@@ -41,7 +41,7 @@ export function readConfig(env: Record<string, string | undefined> = process.env
     apiKey: str(env.MUBIT_API_KEY),
     providerKeyHeader: str(env.MUBIT_PROVIDER_KEY_HEADER),
     openaiApiKey: str(env.OPENAI_API_KEY),
-    requestIdHeader: str(env.MUBIT_REQUEST_ID_HEADER) ?? 'x-request-id',
+    requestIdHeader: str(env.MUBIT_REQUEST_ID_HEADER) ?? 'x-middleware-request-id',
     feedbackUrl: str(env.MUBIT_FEEDBACK_URL),
     refreshUrl: str(env.MUBIT_REFRESH_URL),
     versionsUrl: str(env.MUBIT_VERSIONS_URL),

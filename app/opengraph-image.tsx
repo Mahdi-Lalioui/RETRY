@@ -28,7 +28,7 @@ export default function OpengraphImage() {
         </div>
         <div style={{ display: 'flex', gap: 14 }}>
           {step('1', 'Every call via Mubit', '#FF4500')}
-          {step('2', 'Rescue → training pair', '#F59E0B')}
+          {step('2', 'Rescue to training pair', '#F59E0B')}
           {step('3', 'Versioned update', '#22D3EE')}
           {step('4', 'Held-out gate', '#34D399')}
         </div>

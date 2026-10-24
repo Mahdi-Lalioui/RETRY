@@ -22,7 +22,7 @@ export function detectRescue(task: Task, state: ShopState, action: AgentAction, 
     return { rule: null, kind: 'false_alarm', goodAction: ideal, why: 'False alarm on a healthy checkout' };
   }
   const semKey = action.target ? resolveTarget(state, action.target) : undefined;
-  if (action.type === 'click' && (semKey === 'checkout.ship.standard' || semKey === 'checkout.ship.express')) {
+  if (task.wantsCollect && action.type === 'click' && (semKey === 'checkout.ship.standard' || semKey === 'checkout.ship.express')) {
     return { rule: 'R3', kind: 'violation', goodAction: ideal, why: 'UK test orders use Collect in store' };
   }
   if (action.type === 'type' && semKey === 'checkout.coupon.input' && (action.value ?? '').trim().toUpperCase() !== TEST_COUPON) {

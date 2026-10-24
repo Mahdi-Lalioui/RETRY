@@ -80,7 +80,7 @@ describe('API routes (mock + memory)', () => {
   });
 
   it('finish runs the oracle on the final state', async () => {
-    const state = initialState(9001, 1, ['total_nan']);
+    const state = { ...initialState(9001, 1, ['total_nan']), page: 'checkout' as const, openModals: [], shipping: 'collect' as const };
     const r = await json(await finish(post({ runId: 'run_a', lane: 'base', taskId: 'T1', finalAction: { type: 'report_bug', reason: 'NaN' }, finalState: state })));
     expect(r.data).toMatchObject({ status: 'bug_reported', correct: true });
     const m = await json(await metrics(get('?scope=live')));

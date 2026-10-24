@@ -7,7 +7,7 @@ import { runStepStats } from '@/lib/db/queries';
 import { getMubit } from '@/lib/mubit';
 import { memoryFallbackEnabled, recordRunOutcome } from '@/lib/mubit/memory-fallback';
 import { errorResponse, fail, ok, parseJson, runAfter } from '../../_lib/http';
-import { FinishS } from '../../_lib/schemas';
+import { FinishS, ShopStateS } from '../../_lib/schemas';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
@@ -19,8 +19,9 @@ export async function POST(req: Request) {
     const { runId, lane, taskId, finalAction, stuck } = p.data;
     let raw: unknown = p.data.finalState ?? p.data.finalStateDigest;
     if (typeof raw === 'string') { try { raw = JSON.parse(raw); } catch { return fail('finalStateDigest must be ShopState JSON'); } }
-    if (!raw || typeof raw !== 'object' || !('layout' in raw)) return fail('finalState (ShopState) required');
-    const state = raw as ShopState;
+    const parsedState = ShopStateS.safeParse(raw);
+    if (!parsedState.success) return fail('finalState must be a valid ShopState');
+    const state: ShopState = parsedState.data;
     const task = getTask(taskId);
     const verdict: Verdict = judge(task, state, finalAction as AgentAction | null, { stuck });
 
