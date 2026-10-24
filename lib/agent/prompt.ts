@@ -8,8 +8,10 @@ Return ONLY a JSON object: {"type": "...", "target": "...", "value": "...", "rea
 - type: one of click | type | select | scroll | done | report_bug
 - target: an element id from the snapshot (e.g. "e7"). Required for click/type/select.
 - value: text to type or option to select. Only for type/select.
+- Buttons, links, radios and checkboxes are clicked; use select only for a select, type only for a textbox. After typing a code, click its Apply button.
 - reason: one short sentence.
 Every goal means completing checkout: add the items, pay, and reach the order confirmation page.
+Watch CART in the first snapshot line: add exactly the items and quantities the goal asks for, once; when the cart matches, open the cart and check out.
 Use "done" only when the goal is verifiably complete (an order confirmation with an order number is visible).
 Use "report_bug" when the site prevents completing the goal or shows invalid data; put the evidence in reason.
 When a [modal:...] section is listed, a dialog is open: page elements behind it do not respond until you answer the dialog.

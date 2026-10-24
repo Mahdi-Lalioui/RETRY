@@ -346,6 +346,8 @@ export function act(state: ShopState, action: AgentAction): { state: ShopState; 
     return { state: r.state, result: r.effect, semKey };
   }
   if (action.type === 'select') {
+    // Selecting a radio/checkbox is a click on it (what a browser does); other non-selects are invalid.
+    if (el.role === 'radio' || el.role === 'checkbox') { const c = applyAction(state, semKey); return { state: c.state, result: c.effect, semKey }; }
     if (el.role !== 'select') return { state, result: 'invalid', semKey };
     const r = applyAction(state, semKey, action.value);
     return { state: r.state, result: r.effect, semKey };

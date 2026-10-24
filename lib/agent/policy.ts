@@ -3,7 +3,10 @@ import { nanoid } from 'nanoid';
 import type { StepRequest, StepResponse, ModelRef, AgentAction } from './types';
 import type { Msg } from '@/lib/mubit/types';
 import type { ShopState } from '@/lib/shop/state';
-import { getMubitFor } from '@/lib/mubit';
+import { getMubitFor, liveLanes } from '@/lib/mubit';
+import { inMockFast } from '@/lib/mubit/mock';
+import { RULES } from '@/lib/shop/rules';
+import type { RuleId } from '@/lib/shop/state';
 import { buildMessages, promptChars, snapshotIds } from './prompt';
 import { INVALID_FALLBACK, parseAction, retryMessage } from './parse';
 import { costUsd } from '@/lib/pricing';
@@ -15,10 +18,12 @@ export interface DecideOpts { iclExamples?: string[] }
 
 export async function decide(req: StepRequest, opts: DecideOpts = {}): Promise<StepResponse & { messages: Msg[] }> {
   const mubit = getMubitFor(req.lane);
-  const messages = buildMessages({ goal: req.goal, history: req.history, snapshot: req.snapshot, lane: req.lane, iclExamples: opts.iclExamples });
+  let messages = buildMessages({ goal: req.goal, history: req.history, snapshot: req.snapshot, lane: req.lane, iclExamples: opts.iclExamples });
   const ids = snapshotIds(req.snapshot);
+  const live = await liveRetry(req, messages);
+  if (live) messages = live.messages;
   const base = {
-    model: req.modelRef.model, versionId: req.modelRef.versionId, temperature: 0, seed: 7, jsonMode: true,
+    model: live?.model ?? req.modelRef.model, versionId: live ? undefined : req.modelRef.versionId, temperature: 0, seed: 7, jsonMode: true,
     metadata: { task: 'retry-next-action', lane: req.lane, runId: req.runId, stepIdx: String(req.stepIdx) },
   };
   let res = await mubit.chat({ ...base, messages });
@@ -35,7 +40,7 @@ export async function decide(req: StepRequest, opts: DecideOpts = {}): Promise<S
   const action: AgentAction = parsed.action ?? INVALID_FALLBACK;
   return {
     stepId: `step_${nanoid(10)}`, action, callId: res.callId, latencyMs, usage,
-    costUsd: costUsd(req.modelRef.model, usage), raw, parseOk: !!parsed.action,
+    costUsd: costUsd(live?.model ?? req.modelRef.model, usage), raw, parseOk: !!parsed.action,
     promptChars: promptChars(messages), messages,
   };
 }
@@ -84,4 +89,23 @@ export async function nextAction(req: StepRequest, state?: ShopState, extra: { s
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const { messages, ...resp } = out;
   return resp;
+}
+
+/** Live RETRY lane (MUBIT_LIVE_LANES includes "adapted"): a real model through Mubit, given the house-policy notes
+ *  compiled from the rules humans tagged in rescues for the serving version. Its correct calls form their own Mubit
+ *  task (distinct instructions), which Mubit can train an adapter on. Simulated runs (eval/bootstrap) never take this path. */
+export const RETRY_LIVE_SUFFIX = '\nYou are the RETRY lane: apply every line of the HOUSE TEST POLICY given in the user message.';
+async function liveRetry(req: StepRequest, messages: Msg[]): Promise<{ model: string; messages: Msg[] } | null> {
+  if (req.lane !== 'adapted' || inMockFast() || !liveLanes().includes('adapted')) return null;
+  const v = req.modelRef.versionId ? await findVersion(req.modelRef.versionId) : await repo.versions.current();
+  const tags = (v?.rules ?? []) as string[];
+  const notes = tags.filter((t): t is RuleId => t in RULES).map((t) => `- ${RULES[t].title}`);
+  if (tags.includes('BUG')) notes.push('- If checkout shows broken data (e.g. £NaN, a 500 page, a pay button that does nothing, no order number), use report_bug with the evidence.');
+  const policy = `HOUSE TEST POLICY (compiled from human rescues · ${v?.label ?? 'v1'}):\n${notes.length ? notes.join('\n') : '- (no rules learned yet)'}\n\n`;
+  const [sys, ...rest] = messages;
+  const user = rest[rest.length - 1];
+  return {
+    model: `closed:${process.env.LIVE_RETRY_MODEL || process.env.CLOSED_MODEL || 'gpt-4o-mini'}`,
+    messages: [{ ...sys, content: sys.content + RETRY_LIVE_SUFFIX }, ...rest.slice(0, -1), { ...user, content: policy + user.content }],
+  };
 }

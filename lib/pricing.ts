@@ -3,6 +3,7 @@ export interface Price { inPerM: number; outPerM: number; source: string; checke
 
 export const PRICING: Record<string, Price> = {
   'gpt-4o-mini': { inPerM: 0.15, outPerM: 0.6, source: 'https://openai.com/api/pricing', checkedAt: '2026-10-23' },
+  'gpt-4o-2024-11-20': { inPerM: 2.5, outPerM: 10, source: 'https://openai.com/api/pricing', checkedAt: '2026-10-24' },
 };
 
 /** Strip lane prefixes ("closed:", "open:") and version suffixes ("@v3"). */
