@@ -4,7 +4,7 @@
 > Night Shift: Mubit Hackathon, London. Hacking: Fri 23 Oct 19:30 → Code freeze Sun 25 Oct 10:00.
 > Stack: Next.js (App Router, TypeScript) full-stack, deployed on Vercel. All LLM calls routed through Mubit.
 
-> Verification update, 24 Oct 2026: this plan describes the intended product. Real Mubit inference is now verified, but live feedback and adapter serving require confirmed event-specific APIs; the public API supports console adapter comparisons only. The full learning lifecycle remains a labelled mock rehearsal. Current evidence and limits: [VERIFICATION.md](VERIFICATION.md).
+> Verification update, 24 Oct 2026: this plan describes the intended product. Real Mubit inference and a 60-call scripted-state/real-gateway traffic batch requesting `gpt-4o-mini` are verified; a requested model does not prove serving identity. The authenticated workspace enables automatic adapter training, approval after tests and transparent rollout; public model IDs do not directly pin adapters. At 11:55 London the QA task had 1 kept example of 25 required, review work pending, no training started and no route. Correction delivery and exact baseline/served-version identities remain unverified, so the complete app learning lifecycle remains a labelled mock rehearsal. Current evidence and limits: [VERIFICATION.md](VERIFICATION.md).
 
 This file is the single source of truth. Every Claude Code agent working on this repo MUST read it fully before writing code, and MUST NOT deviate from the contracts in §5 without updating this file first.
 

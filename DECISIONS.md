@@ -43,7 +43,18 @@
 - Resolve lane models from server configuration, validate shop/action HTTP inputs, and load .env.local for CLI scripts.
 - Official Mubit uses its mbt_ key, /openai/v1 provider proxy and x-middleware-request-id; provider secrets are not forwarded.
 - Local correction persistence means queued, not delivered; reconcile delivery status before showing sent or trained.
-- Keep the full learning demo labelled mock until open provider access and confirmed feedback/adapter-serving contracts exist.
+- Keep the full learning demo labelled mock until correction delivery and exact baseline/served-version identities are verified; separate open-provider access is not established as a requirement for Mubit's managed automatic adapters.
+
+## Live adapter evidence — 24 October 2026
+- Distinguish direct adapter pinning from transparent routing: public model IDs cannot select an adapter, while the authenticated workspace enables automatic training, approval after tests and rollout. A blanket claim that Mubit cannot serve adapters through the gateway is unsupported.
+- Keep the existing configured requested model and client; do not substitute an open model or invent correction, refresh, version or routing APIs. Groq/OpenRouter `provider_key_missing` blocks those baselines, not necessarily Mubit's managed adapter bases.
+- Label live traffic `scripted-state-real-gateway-output` and record `requestedModel` independently of serving identity. The 60-call batch requested `gpt-4o-mini` and all real gateway outputs parsed successfully on scripted shop checkpoints. These are not human rescues, accepted examples or evidence of trained/serving adapters.
+- Track task `ln_59528eba80467078eac9bba6`, key `lk1_b13b77178816b887be7542bc756eca91`. At 11:55 London: 311 calls, 250 usable, 1 kept of 25 required, 1 rejected, 248 waiting; review today 200 queued, 50 over limit, 11 running; first training not started and no route. Counters describe the task snapshot, not the 60-call batch alone.
+- `npm run train:live -- --examples 60 --output work/training-evidence.json` sends bounded billable gateway traffic and saves actual evidence. Keep training/held-out seeds disjoint, concurrency at most 3, no-overwrite output, and no guessed feedback/refresh calls.
+- Keep metadata support false for the verified OpenAI route after HTTP 400 without provider storage; use distinct first user messages for Mubit's documented session fallback. Do not alter provider storage or quality/promotion bars to make training appear complete.
+- Treat automatic workspace promotion and RETRY's local held-out gate as separate mechanisms. A fair live comparison needs actual baseline/version serving identities, not a requested model name or a passed adapter badge.
+- Scope the observed task ID and 60-call batch to their earlier system prompt. Changed instructions may create a new Mubit task; identify future calls' task rather than combining their counts with the old snapshot.
+
 ## Agent H
 - [H] Mubit impact strip sits on the right of the story strip (held-out scope only, hidden during a rescue). Every number comes from the existing scoreboard rows. Cost shows GPT $/run next to "RETRY on own credits" because RETRY's cost is null, so no "× cheaper" figure is shown.
 - [H] Version rail (v1→vN chips, +rules learned vs the previous ready version) sits under the training ring. It reads /api/versions through a component hook; the popover shows only stored held-out metrics.

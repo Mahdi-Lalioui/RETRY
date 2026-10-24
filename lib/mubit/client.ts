@@ -91,7 +91,7 @@ export function createRealClient(c: MubitConfig = cfg()): MubitClient {
   return {
     async chat(req: ChatReq): Promise<ChatRes> {
       if (officialApi && req.versionId) {
-        throw new Error('[mubit] The public API does not support adapter inference. Compare adapter versions in the Mubit console; configure a confirmed adapter API to run them here.');
+        throw new Error('[mubit] The public API cannot pin a requested adapter version. Mubit manages automatic routing in the console; configure a confirmed version-addressing API for isolated adapter evaluation here.');
       }
       if (req.versionId && c.versionMode === 'console_pin') {
         throw new Error('[mubit] A console pin cannot transmit a version identity. Configure a confirmed version model suffix or header before evaluating an adapter.');
