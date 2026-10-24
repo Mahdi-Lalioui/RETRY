@@ -46,6 +46,11 @@ describe('API routes (mock + memory)', () => {
     expect(r.status).toBe(400); expect((await json(r)).ok).toBe(false);
   });
 
+  it('[G] step with a malformed state does not 500', async () => {
+    const r = await step(post({ ...stepBody('base', 'run_junk'), state: { junk: true } }));
+    expect(r.status).toBe(200);
+  });
+
   it('rescue → refresh → promoted version declines the upsell', async () => {
     const s1 = await json(await step(post(stepBody('base', 'run_a'))));
     expect(s1.ok).toBe(true);
