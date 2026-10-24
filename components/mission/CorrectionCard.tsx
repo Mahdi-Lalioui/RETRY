@@ -21,7 +21,9 @@ export function CorrectionCard({ c, className, compact }: { c: CorrectionView; c
       <span className="absolute inset-y-0 left-0 w-[3px] bg-rescue" style={{ boxShadow: '0 0 12px #F59E0B' }} />
       <div className="flex items-center gap-1.5">
         <span className="truncate rounded-[5px] border border-rescue/40 bg-rescue/10 px-1.5 font-mono text-[10.5px] text-[#FCD34D]">{ruleLabel}</span>
-        <span className="shrink-0 rounded-[5px] border border-white/10 px-1.5 font-mono text-[10px] text-white/60">human</span>
+        {c.source === 'scripted'
+          ? <span className="shrink-0 rounded-[5px] border border-yellow-400/40 bg-yellow-400/10 px-1.5 font-mono text-[10px] text-yellow-300">scripted</span>
+          : <span className="shrink-0 rounded-[5px] border border-white/10 px-1.5 font-mono text-[10px] text-white/60">human</span>}
         {(c.augmented > 0 || c.status === 'queued') && <span className="shrink-0 rounded-[5px] border border-white/10 px-1.5 font-mono text-[10px] text-white/60">×{c.augmented} augmented</span>}
       </div>
       <div className={cn('mt-1.5 font-mono text-[11px] leading-[16px]', compact && 'mt-1')}>

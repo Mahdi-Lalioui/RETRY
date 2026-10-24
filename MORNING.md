@@ -41,4 +41,7 @@ Also known, from the public `@mubit-ai/sdk` package: the control plane is `https
 ## 4. Before the demo
 - **Rotate both API keys after the hackathon.** They were pasted into chat.
 - Rehearse plan.md §24 (3:00 script). If anything is flaky on stage, press `D` to replay the recorded run. It is clearly labelled as a replay.
+- Stage tip: on T2 the Base lane breaks several rules in a row (R1, R6, R2, R4), because it never learns mid-run. Do the first rescue live, then press `Esc` to skip the rest so the 3:00 slot holds.
+- R7 (gift wrap) appears after pressing `S` twice from the start (layout-v6). That's the live "new rule" moment. Rescue it, press `T`, watch v5 get promoted, then press `R` again.
+- Verified overnight on a production build in Chromium: the full §24 flow, `/lab`, `/corrections`, `/attract`, zero console errors.
 - Read `DECISIONS.md` (every choice made overnight) and `BLOCKED.md` (what needs you).
