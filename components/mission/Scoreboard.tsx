@@ -62,7 +62,8 @@ export function Scoreboard() {
   const lanes: LaneId[] = iclOn ? ['closed', 'base', 'adapted', 'icl'] : ['closed', 'base', 'adapted'];
   const label = (l: LaneId) => (l === 'adapted' ? `RETRY ${adapted}` : l === 'base' ? 'Base v1' : l === 'closed' ? 'GPT' : 'ICL');
   const baseSuccess = rows.find((r) => r.key === 'success' || /success/i.test(r.label))?.values.base ?? null;
-  const displayRows = rows.length ? rows : PLACEHOLDER;
+  // Prompt size only differs once the ICL lane is on; hide it otherwise so the board fits at 720p.
+  const displayRows = (rows.length ? rows : PLACEHOLDER).filter((r) => iclOn || !/prompt/i.test(r.label));
   // Winning column = the lane that is best on the most rows; it gets a glowing column.
   const wins: Partial<Record<LaneId, number>> = {};
   for (const r of rows) { const b = bestLane(r, lanes); if (b) wins[b] = (wins[b] ?? 0) + 1; }

@@ -7,7 +7,7 @@ export const contentType = 'image/png';
 export default function OpengraphImage() {
   const step = (n: string, t: string, c: string) => (
     <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 18px', borderRadius: 14, border: `2px solid ${c}66`, background: `${c}14`, color: '#E8EDF5', fontSize: 24 }}>
-      <span style={{ color: c, fontWeight: 700 }}>{n}</span>{t}
+      <span style={{ color: c, fontWeight: 700, marginRight: 4 }}>{n}</span>{t}
     </div>
   );
   return new ImageResponse(

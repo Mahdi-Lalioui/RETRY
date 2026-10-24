@@ -12,3 +12,14 @@
 - [D] Updated tests/api.test.ts expectation: refresh now evaluates v1+v2 on 48 runs, so the board's base row has 48 runs.
 - Live rescues only on Base and RETRY lanes; GPT and ICL lanes end with their violation verdict (keeps the stage demo readable).
 - Modal overlay in the shop uses a solid dim instead of backdrop-blur (Chromium mirrors edges inside scaled iframes).
+
+## Agent F
+- [F] Story strip captions are derived client-side from existing store state + the `stamp` bus event; no store additions.
+- [F] "How Mubit is used" overlay (`?`, or the top-bar button) states only what the app does: route calls, capture rescue as feedback, versioned adapter, 48-run held-out gate.
+- [F] Lane deck tilts 7° in CSS 3D only while idle and straightens as soon as any lane has steps (so rescue clicks hit-test on a flat iframe).
+- [F] Rescue spotlight dims the other lanes to 35% (opacity/transform only); removed every backdrop-filter over or inside the scaled shop iframes.
+- [F] Promotion is one deck-wide effect (light sweep, cyan particles, "v4 → v5 PROMOTED" plate) driven by the existing `burst` event; the per-lane cyan sweep was removed.
+- [F] Mubit core burst is timed to the card's arrival (1.75s after the `card` event), matching the FlyingCards timeline.
+- [F] Scoreboard hides "Prompt size" unless the ICL lane is on (identical across lanes otherwise) so it fits at 1280×720.
+- [F] Raised --faint/--muted and the panel-label/caption sizes for projector contrast; body text ≥12px in the new UI.
+- [F] Replaced the default favicon.ico with an original app/icon.svg (circular-arrow glyph) and added app/opengraph-image.tsx.

@@ -36,7 +36,7 @@ export function HowMubit() {
   return (
     <AnimatePresence>
       {open && (
-        <motion.div className="fixed inset-0 z-[80] flex items-center justify-center bg-[#05060Af2] p-6" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setOpen(false)}>
+        <motion.div className="fixed inset-0 z-[80] flex items-center justify-center bg-[#05060A] p-6" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setOpen(false)}>
           <div className="how-grid pointer-events-none absolute inset-0" />
           <motion.div onClick={(e) => e.stopPropagation()} initial={{ y: 24, scale: 0.98 }} animate={{ y: 0, scale: 1 }} exit={{ y: 12, opacity: 0 }} transition={{ type: 'spring', stiffness: 240, damping: 26 }}
             className="relative w-full max-w-[1500px]">
