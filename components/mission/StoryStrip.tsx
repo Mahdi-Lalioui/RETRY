@@ -94,7 +94,7 @@ export function StoryStrip() {
           </motion.div>
         </AnimatePresence>
       </div>
-      {scope === 'heldout' && <><span className="h-4 w-px shrink-0 bg-white/10" /><ImpactStrip /></>}
+      {scope === 'heldout' && !state.rescue && <><span className="h-4 w-px shrink-0 bg-white/10" /><ImpactStrip /></>}
     </div>
   );
 }

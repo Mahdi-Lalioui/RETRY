@@ -34,3 +34,13 @@
 - [E] Mock DECLINE regex matches "No gift wrap" (was unmatched → learned-R7 versions still clicked the first button, often "Add gift wrap").
 - [E] Mission tray on boot shows bootstrap corrections too, marked `source:'scripted'` on CorrectionView.
 - [E] Refresh status reports 'evaluating' on the poll where training finishes, so the ring shows training → evaluating → promoted on mock too.
+
+## Agent H
+- [H] Mubit impact strip sits on the right of the story strip (held-out scope only, hidden during a rescue). Every number comes from the existing scoreboard rows. Cost shows GPT $/run next to "RETRY on own credits" because RETRY's cost is null, so no "× cheaper" figure is shown.
+- [H] Version rail (v1→vN chips, +rules learned vs the previous ready version) sits under the training ring. It reads /api/versions through a component hook; the popover shows only stored held-out metrics.
+- [H] Judge's turn intro wraps judgesTurn() in components (judge.ts): the overlay shows first, the seed digits roll until judgesTurn sets the real unseen seed, then they lock. lib/ is untouched.
+- [H] Bug mic-drop fires only on the RETRY lane's bug_reported verdict. BugReportCard's delay is raised to 1.5s so the ticket slides out after the slam.
+- [H] Presenter mode (P, saved in localStorage) hides [data-dev] chrome (seed, clock, captions, ticket picker). It enlarges the narration only at ≥1536px so 720p never clips.
+- [H] The scoreboard's RETRY column count-up waits ~900ms after a promotion so it rolls as the training ring closes.
+- [H] /attract: fixed-aspect lanes, a centred big caption band, a live "calls routed through Mubit" counter (one per replayed model step), a held-out scoreboard ticker from /api/metrics, and Esc/Exit back to Mission Control.
+- [H] Rule radar skipped: there is no free space at 1280×720 without shrinking the shops, and the version rail + impact strip tell the same story.

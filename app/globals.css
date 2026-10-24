@@ -200,6 +200,6 @@ body::after {
 
 /* Agent H: presenter mode (P) — hide dev chrome, enlarge narration for the stage */
 .presenter [data-dev] { display: none !important; }
-.presenter .story-strip { height: 46px; }
-.presenter .story-text { font-size: 17px; }
+.presenter .story-strip { height: 34px; }
+.presenter .story-text { font-size: 15px; }
 @media (min-width: 1536px) { .presenter .story-strip { height: 54px; } .presenter .story-text { font-size: 21px; } }
