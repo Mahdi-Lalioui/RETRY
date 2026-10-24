@@ -105,3 +105,14 @@ describe('API routes (mock + memory)', () => {
     expect(m.data.rows.find((r: { lane: string }) => r.lane === 'base').runs).toBe(48);
   });
 });
+
+describe('[G] cold instance', () => {
+  it('a step naming a version this instance never saw bootstraps, so RETRY is not served as the naive base', async () => {
+    const { resetBootstrapCache } = await import('@/lib/train/bootstrap');
+    const repo = resetMemoryRepo(); resetBootstrapCache();
+    const r = await json(await step(post({ ...stepBody('adapted', 'run_cold'), modelRef: { kind: 'open', model: 'open:open-base', versionId: 'ver_v6_other', label: 'RETRY v6' } })));
+    expect(r.ok).toBe(true);
+    expect((await repo.versions.list()).length).toBeGreaterThan(1);
+    expect(r.data.action).toMatchObject({ type: 'click', target: 'e3' }); // declines the upsell
+  });
+});
