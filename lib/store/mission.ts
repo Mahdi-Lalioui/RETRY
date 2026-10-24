@@ -54,6 +54,8 @@ export interface MissionState {
   adapted: AdaptedVersion; flipKey: number; prevAdaptedLabel?: string;
   scope: Scope; rows: ScoreRow[]; curve: CurvePoint[]; metricsKey: number;
   breakMenu: boolean; replayAt?: string;
+  /** Agent E: recording's honestLabel (ReplayBanner must show it verbatim), title, current scene caption; Shift+R recorder on. */
+  replayLabel?: string; replayTitle?: string; replayCaption?: string; recording?: boolean;
 
   set: (p: Partial<MissionState>) => void;
   patchLane: (lane: LaneId, p: Partial<LaneRuntime> | ((l: LaneRuntime) => Partial<LaneRuntime>)) => void;

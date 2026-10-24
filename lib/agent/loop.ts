@@ -13,6 +13,7 @@ import { emit } from '@/lib/store/bus';
 import { MAX_STEPS, REFRESH_MIN_EXAMPLES } from '@/lib/store/lanes';
 import { useMission, type CorrectionView, type CurvePoint, type ScoreRow, type Scope } from '@/lib/store/mission';
 import { play } from '@/lib/store/sfx';
+import { installRecorderHotkey, recordEvent, startReplay, stopReplay } from './demo-driver';
 
 const S = () => useMission.getState();
 const controllers = new Map<LaneId, AbortController>();
@@ -59,6 +60,7 @@ async function finish(runId: string, lane: LaneId, taskId: string, finalAction: 
 }
 
 function stamp(lane: LaneId, v: Verdict) {
+  recordEvent({ kind: 'verdict', sceneId: S().taskId, lane, runId: S().lanes[lane].runId ?? '', verdict: v, steps: S().lanes[lane].steps.length });
   S().patchLane(lane, (l) => ({ verdict: v, verdictKey: l.verdictKey + 1, status: 'done', thinking: false }));
   emit('stamp', { lane });
   play('thunk');
@@ -86,6 +88,7 @@ async function runLane(lane: LaneId, sig: AbortSignal) {
       }, sig);
       check(sig);
       emit('call', { lane, ms: res.latencyMs });
+      recordEvent({ kind: 'step', sceneId: S().taskId, lane, runId, stepIdx, action: res.action, result: 'ok', latencyMs: res.latencyMs, costUsd: res.costUsd, promptChars: res.promptChars, snapshot: snap.snapshot });
       S().set({ calls: S().calls + 1 });
       const entry = { idx: stepIdx, action: res.action, label: res.action.target ? labels[res.action.target] : undefined, latencyMs: res.latencyMs, stepId: res.stepId };
       S().patchLane(lane, (l) => ({
@@ -179,6 +182,7 @@ async function submitCorrection(lane: LaneId, stepId: string, bad: AgentAction, 
   };
   S().set({ corrections: [view, ...S().corrections].slice(0, 12) });
   emit('card', { id, lane });
+  recordEvent({ kind: 'correction', sceneId: S().taskId, lane, rule: (r.rule === 'other' ? null : r.rule ?? (good.type === 'report_bug' ? 'BUG' : null)) as RuleId | 'BUG' | null, source: 'human', badAction: bad, goodAction: good, augmented: 8 });
   const isBug = good.type === 'report_bug';
   const rule = r.rule === 'other' ? 'Other' : r.rule ?? (isBug ? 'BUG' : undefined);
   const note = r.rule === 'other' && r.ruleText ? r.ruleText : undefined;
@@ -227,6 +231,9 @@ export async function runAll() {
   resetFrames();
   s.set({ running: true });
   const lanes = s.activeLanes();
+  const task = getTask(s.taskId);
+  recordEvent({ kind: 'scene', sceneId: s.taskId, title: task.id, caption: task.goal, taskId: task.id, goal: task.goal, seed: s.seed, versionIndex: s.versionIndex, bugs: s.bugs, layoutTag: s.layoutTag,
+    lanes: lanes.map((l) => ({ lane: l, label: LANES[l].label, versionLabel: l === 'adapted' ? s.adapted.label : l === 'base' ? 'v1' : '' })) });
   await new Promise((r) => setTimeout(r, 200));
   await Promise.all(lanes.map(async (lane) => {
     const c = new AbortController();
@@ -297,6 +304,7 @@ export function toggleDemo() {
   const s = S();
   const next = s.mode === 'live' ? 'replay' : 'live';
   if (next === 'replay') stopAll();
+  else { stopReplay(); s.resetLanes(); resetFrames(); }
   s.set({ mode: next, replayAt: s.replayAt ?? new Date().toLocaleString('en-GB', { weekday: 'short', hour: '2-digit', minute: '2-digit' }) });
   if (next === 'replay') void replayProvider?.();
 }
@@ -320,6 +328,7 @@ export async function trainNow() {
       await new Promise((r) => setTimeout(r, 1000));
       const st = await apiSafe<StatusRes>(`/api/refresh/status${jobId ? `?jobId=${encodeURIComponent(jobId)}` : ''}`);
       if (!st) continue;
+      if (st.phase !== 'collecting') recordEvent({ kind: 'version', phase: st.phase, label: st.version?.label ?? '…', progress: st.progress ?? (st.phase === 'promoted' || st.phase === 'held_back' ? 1 : 0.5), examples: st.version?.examples ?? undefined, headline: st.reason });
       if (st.phase === 'training' || st.phase === 'collecting') S().set({ training: { ...S().training, phase: 'training', progress: st.progress ?? Math.min(0.95, (Date.now() - startedAt) / 120000) } });
       else if (st.phase === 'evaluating') S().set({ training: { ...S().training, phase: 'evaluating', progress: st.progress ?? 0.5 } });
       else if (st.phase === 'held_back') {
@@ -389,6 +398,9 @@ export async function loadMetrics(scope: Scope = S().scope) {
 }
 
 export async function boot() {
+  // Agent E: D replays public/demo/session-default.json through the real lanes; Shift+R records a live session.
+  if (!replayProvider) setReplayProvider(() => startReplay());
+  installRecorderHotkey();
   // Agent D: seeds demo data when the DB is empty. Missing route -> ignored.
   await apiSafe('/api/demo/bootstrap', {});
   const [health, versions, corrections] = await Promise.all([
@@ -398,6 +410,7 @@ export async function boot() {
   ]);
   const s = S();
   if (health) s.set({ health, mode: health.demoMode ? 'replay' : s.mode });
+  if (health?.demoMode) void startReplay();
   else s.set({ health: { mubit: 'down', db: 'unknown', demoMode: false } });
   if (Array.isArray(versions)) {
     const v = latestPromoted(versions);
