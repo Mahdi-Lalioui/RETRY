@@ -14,7 +14,8 @@
     "train:live": "tsx scripts/train-live.ts",
     "seed:corrections": "tsx scripts/seed-corrections.ts",
     "eval": "tsx scripts/run-eval.ts",
-    "record:demo": "tsx scripts/record-demo.ts"
+    "record:demo": "tsx scripts/record-demo.ts",
+    "reset:demo": "tsx scripts/reset-demo.ts"
   },
   "dependencies": {
     "@mubit-ai/sdk": "^0.13.2",

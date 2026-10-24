@@ -47,6 +47,7 @@ cp .env.example .env.local   # fill in keys; leave MUBIT_ENABLED=false for mock 
 npm run dev                  # http://localhost:3000
 npm test                     # regression suite
 npm run smoke:mubit          # checks the configured Mubit endpoints
+npm run reset:demo           # with DATABASE_URL: roll the shared DB back to v4 / 0 rescues before each demo
 ```
 To deploy and to switch to real Mubit, see `MORNING.md`.
 
