@@ -38,6 +38,13 @@ export function MubitPipe() {
   const pathRefs = useRef<Partial<Record<LaneId, SVGPathElement | null>>>({});
   const layer = useRef<SVGGElement>(null);
   const coreRef = useRef<SVGGElement>(null);
+  const [bursts, setBursts] = useState<number[]>([]);
+  // A correction card reaches the core ~1.8s after lift-off (FlyingCards timeline): amber + orange shockwaves.
+  useEffect(() => on('card', () => {
+    const id = Date.now() + Math.random();
+    setTimeout(() => setBursts((b) => [...b, id]), 1750);
+    setTimeout(() => setBursts((b) => b.filter((x) => x !== id)), 2900);
+  }), []);
 
   useLayoutEffect(() => {
     const el = wrap.current;
@@ -144,6 +151,15 @@ export function MubitPipe() {
         <g ref={layer} />
         <g ref={coreRef} className="mubit-core" style={{ transformOrigin: `${cx}px ${cy}px` }}>
           <polygon points={HEX(cx, cy, r * 1.25)} fill="#FF4500" opacity="0.45" filter="url(#coreglow)" className="core-halo" />
+          <circle cx={cx} cy={cy} r={r * 1.55} fill="none" stroke="#FF6A2B" strokeOpacity="0.55" strokeWidth="1.2" strokeDasharray="2 7" className="core-ring" />
+          <circle cx={cx} cy={cy} r={r * 1.85} fill="none" stroke="#FFB27A" strokeOpacity="0.25" strokeWidth="1" strokeDasharray="18 10 4 10" className="core-ring rev" />
+          <polygon points={HEX(cx, cy, r * 1.32)} fill="none" stroke="#FF4500" strokeOpacity="0.35" strokeWidth="1" className="core-ring rev" />
+          {bursts.map((b) => (
+            <g key={b}>
+              <circle cx={cx} cy={cy} r={r} fill="none" stroke="#F59E0B" strokeWidth="3" className="core-burst" />
+              <polygon points={HEX(cx, cy, r)} fill="#FF4500" fillOpacity="0.25" stroke="#FFC9A8" strokeWidth="2" className="core-burst" style={{ animationDelay: '.12s' }} />
+            </g>
+          ))}
           <g className="animate-breathe" style={{ transformOrigin: `${cx}px ${cy}px`, transformBox: 'view-box' }}>
             <polygon points={HEX(cx, cy, r)} fill="url(#coregrad)" stroke="#FFC9A8" strokeOpacity="0.7" strokeWidth="1" />
             <polygon points={HEX(cx, cy, r * 0.62)} fill="none" stroke="#fff" strokeOpacity="0.45" strokeWidth="1" />

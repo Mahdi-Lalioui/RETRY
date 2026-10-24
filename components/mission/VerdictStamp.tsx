@@ -38,13 +38,13 @@ function Stamp({ verdict, reduce }: { verdict: Verdict; reduce: boolean }) {
   const long = look.title.length > 14;
   return (
     <motion.div
-      initial={reduce ? { rotate: -6, opacity: 0 } : { scale: 1.45, rotate: -6, opacity: 0 }}
-      animate={reduce ? { rotate: -6, opacity: 1 } : { scale: 1, rotate: [-6, -7.5, -5, -6], opacity: 1, x: [0, -3, 3, -1, 0] }}
-      transition={{ scale: { type: 'spring', stiffness: 420, damping: 18 }, opacity: { duration: 0.12 }, rotate: { duration: 0.35, delay: 0.12 }, x: { duration: 0.3, delay: 0.12 } }}
+      initial={reduce ? { rotate: -6, opacity: 0 } : { scale: 1.9, rotate: -6, opacity: 0 }}
+      animate={reduce ? { rotate: -6, opacity: 1 } : { scale: 1, rotate: [-6, -7.5, -5, -6], opacity: 1, x: [0, -7, 6, -4, 2, 0], y: [0, 3, -2, 1, 0] }}
+      transition={{ scale: { type: 'spring', stiffness: 520, damping: 16 }, opacity: { duration: 0.12 }, rotate: { duration: 0.35, delay: 0.12 }, x: { duration: 0.35, delay: 0.1 }, y: { duration: 0.35, delay: 0.1 } }}
       className="flex max-w-[88%] flex-col items-center"
     >
       <div
-        className="rounded-[10px] border-[3px] px-[0.6em] py-[0.12em] text-center font-black uppercase leading-none tracking-[0.04em]"
+        className="ink rounded-[10px] border-[4px] px-[0.6em] py-[0.12em] text-center font-black uppercase leading-none tracking-[0.04em]"
         style={{
           fontSize: long ? 'clamp(15px, 2.1vw, 34px)' : 'clamp(26px, 3.6vw, 60px)',
           color: look.fill ? '#fff' : look.color,
@@ -52,7 +52,7 @@ function Stamp({ verdict, reduce }: { verdict: Verdict; reduce: boolean }) {
           background: look.fill ? look.color : '#07080Bcc',
           boxShadow: `0 0 0 1px #000, 0 0 40px ${look.color}66, inset 0 0 18px ${look.color}33`,
           textShadow: look.fill ? 'none' : `0 0 18px ${look.color}88`,
-          maskImage: 'radial-gradient(circle at 30% 40%, #000 60%, #000c 100%)',
+
         }}
       >
         {look.title}
@@ -60,7 +60,7 @@ function Stamp({ verdict, reduce }: { verdict: Verdict; reduce: boolean }) {
       {look.sub && (
         <motion.div
           initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.35 }}
-          className="mt-2 max-w-full truncate rounded-md bg-black/75 px-2 py-1 text-center font-mono text-[11px] text-white/85 backdrop-blur"
+          className="mt-2 max-w-full truncate rounded-md bg-black/75 px-2 py-1 text-center font-mono text-[11px] text-white/85"
         >
           {look.sub}
         </motion.div>

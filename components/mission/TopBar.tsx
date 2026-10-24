@@ -48,7 +48,7 @@ function MubitPill() {
           <span className="absolute inset-0 rounded-full opacity-60 animate-ping" style={{ background: cfg.dot, animationDuration: '2s' }} />
           <span className="relative h-2 w-2 rounded-full" style={{ background: cfg.dot, boxShadow: `0 0 8px ${cfg.dot}` }} />
         </span>
-        <span className={mode === 'mock' || mode === 'down' ? 'font-mono tracking-wider' : ''}>{cfg.text}</span>
+        <span className={`whitespace-nowrap ${mode === 'mock' || mode === 'down' ? 'font-mono tracking-wider' : ''}`}>{cfg.text}</span>
       </span>
     </Tooltip>
   );
@@ -66,8 +66,16 @@ export function TopBar() {
       <div className="flex items-center gap-2.5">
         <RetryGlyph />
         <span className="text-[19px] font-bold tracking-[-0.02em] text-white 2xl:text-[21px]">RETRY</span>
-        <span className="rounded-[5px] border border-rescue/40 bg-rescue/10 px-1.5 py-[1px] font-mono text-[9.5px] font-semibold tracking-[0.16em] text-rescue">NIGHT SHIFT</span>
-        <span className="hidden text-[12px] text-muted xl:inline">AI QA tester that learns your house rules from every rescue</span>
+        <span className="hidden whitespace-nowrap rounded-[5px] 2xl:inline border border-rescue/40 bg-rescue/10 px-1.5 py-[1px] font-mono text-[10.5px] font-semibold tracking-[0.16em] text-rescue">NIGHT SHIFT</span>
+        <nav className="ml-2 flex items-center gap-0.5 text-[12.5px] 2xl:text-[13px]">
+          <span className="whitespace-nowrap rounded-md bg-white/[0.07] px-2 py-1 text-white">Mission Control</span>
+          {[['/lab', 'Lab'], ['/corrections', 'Corrections'], ['/attract', 'Attract']].map(([h, l]) => (
+            <a key={h} href={h} className="whitespace-nowrap rounded-md px-2 py-1 text-[#9AA4B4] transition-colors hover:bg-white/[0.05] hover:text-white">{l}</a>
+          ))}
+          <button onClick={() => window.dispatchEvent(new Event('retry:how'))} className="ml-1 flex items-center gap-1 rounded-md border border-mubit/40 px-2 py-[3px] text-[12px] text-[#FF8A5B] hover:bg-mubit/10">
+            <span className="hidden 2xl:inline">How Mubit is used</span><span className="2xl:hidden">Mubit</span> <kbd className="rounded border border-mubit/40 px-1 font-mono text-[10.5px]">?</kbd>
+          </button>
+        </nav>
       </div>
 
       <div className="mx-auto flex min-w-0 items-center gap-2">

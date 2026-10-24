@@ -14,30 +14,42 @@ import { Scoreboard } from './Scoreboard';
 import { ControlDeck } from './ControlDeck';
 import { FlyingCards } from './FlyingCards';
 import { Hotkeys } from './Hotkeys';
+import { StoryStrip } from './StoryStrip';
+import { HowMubit } from './HowMubit';
+import { IdleHero } from './IdleHero';
+import { PromotionFX } from './PromotionFX';
 
 export function MissionControl() {
   const iclOn = useMission((s) => s.iclOn);
+  // The lane deck sits slightly tilted in 3D while idle and straightens as soon as anything runs.
+  const active = useMission((s) => s.running || !!s.rescue || Object.values(s.lanes).some((l) => l.steps.length > 0));
   const lanes: LaneId[] = iclOn ? ['closed', 'base', 'adapted', 'icl'] : ['closed', 'base', 'adapted'];
   useEffect(() => { void boot(); }, []);
   return (
     <main className="relative flex h-dvh w-screen flex-col overflow-clip">
+      <div className="grid-parallax" aria-hidden />
       <TopBar />
       <ReplayBanner />
-      <div className="flex min-h-0 flex-1 flex-col px-4 2xl:px-6">
+      <div className="relative flex min-h-0 flex-1 flex-col px-4 2xl:px-6">
         <MubitPipe />
         <LayoutGroup>
-          <div
-            className="grid min-h-0 shrink-0 gap-3"
-            style={{
-              gridTemplateColumns: `repeat(${lanes.length}, minmax(0, 1fr))`,
-              // lane height follows the 16:10 shop at full column width, capped so the bottom row keeps ≥ ~190px
-              height: `min(calc((100vw - 48px - ${(lanes.length - 1) * 12}px) / ${lanes.length} * 0.625 + 112px), calc(100dvh - 400px))`,
-            }}
-          >
-            {lanes.map((l) => <Lane key={l} lane={l} />)}
+          <div className="deck-stage relative shrink-0">
+            <div
+              className={`deck grid min-h-0 gap-3 ${active ? 'deck-flat' : 'deck-tilt'}`}
+              style={{
+                gridTemplateColumns: `repeat(${lanes.length}, minmax(0, 1fr))`,
+                // lane height follows the 16:10 shop at full column width, capped so the bottom row keeps room
+                height: `min(calc((100vw - 48px - ${(lanes.length - 1) * 12}px) / ${lanes.length} * 0.625 + 112px), calc(100dvh - 425px))`,
+              }}
+            >
+              {lanes.map((l) => <Lane key={l} lane={l} />)}
+            </div>
+            <IdleHero />
+            <PromotionFX />
           </div>
         </LayoutGroup>
-        <div className="mt-3 grid min-h-[150px] flex-1 gap-3" style={{ gridTemplateColumns: 'minmax(0,1fr) minmax(0,0.95fr) minmax(0,1.75fr)' }}>
+        <StoryStrip />
+        <div className="mt-2.5 grid min-h-[140px] flex-1 gap-3" style={{ gridTemplateColumns: 'minmax(0,1fr) minmax(0,0.95fr) minmax(0,1.75fr)' }}>
           <CorrectionTray />
           <TrainingRing />
           <Scoreboard />
@@ -47,6 +59,7 @@ export function MissionControl() {
       <ControlDeck />
       <FlyingCards />
       <Hotkeys />
+      <HowMubit />
     </main>
   );
 }

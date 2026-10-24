@@ -31,7 +31,7 @@ export function BugReportCard({ bug, onClose }: { bug: BugReport; onClose: () =>
     <motion.div
       initial={{ y: 40, opacity: 0, scale: 0.96 }} animate={{ y: 0, opacity: 1, scale: 1 }} exit={{ y: 30, opacity: 0 }}
       transition={{ type: 'spring', stiffness: 260, damping: 26, delay: 0.6 }}
-      className="pointer-events-auto absolute inset-x-2 bottom-2 z-40 max-h-[62%] overflow-hidden rounded-[10px] border border-fail/45 bg-[#140a0d]/95 shadow-[0_18px_60px_-12px_#F43F5E55] backdrop-blur-md"
+      className="pointer-events-auto absolute inset-x-2 bottom-2 z-40 max-h-[62%] overflow-hidden rounded-[10px] border border-fail/45 bg-[#140a0d] shadow-[0_18px_60px_-12px_#F43F5E55]"
     >
       <div className="flex items-center gap-2 border-b border-fail/25 bg-fail/10 px-2.5 py-1.5">
         <Bug className="h-3.5 w-3.5 text-fail" />

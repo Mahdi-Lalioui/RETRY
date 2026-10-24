@@ -18,6 +18,7 @@ export function Lane({ lane }: { lane: LaneId }) {
   const l = useMission((s) => s.lanes[lane]);
   const patchLane = useMission((s) => s.patchLane);
   const layoutFlash = useMission((s) => s.layoutFlash);
+  const dimmed = useMission((s) => !!s.rescue && s.rescue.lane !== lane);
   const [glow, setGlow] = useState<string | null>(null);
   const [burst, setBurst] = useState(0);
 
@@ -38,12 +39,11 @@ export function Lane({ lane }: { lane: LaneId }) {
       layout
       transition={{ type: 'spring', stiffness: 260, damping: 26 }}
       data-lane-col={lane}
-      className="panel relative flex min-h-0 min-w-0 flex-col"
+      className={`panel lane-card relative flex min-h-0 min-w-0 flex-col ${dimmed ? 'lane-dim' : ''} ${rescue ? 'lane-spot' : ''}`}
       style={{
         ['--lane' as string]: t.hex,
         borderColor: rescue ? '#F59E0B' : `${t.hex}66`,
-        boxShadow: glow ? `0 0 0 1px ${glow}, 0 0 50px -6px ${glow}aa, inset 0 1px 0 #ffffff08` : undefined,
-        transition: 'box-shadow .5s ease, border-color .3s ease',
+        boxShadow: glow ? `0 0 0 2px ${glow}, 0 0 70px -4px ${glow}cc, inset 0 0 40px -10px ${glow}66` : rescue ? '0 0 0 2px #F59E0B, 0 0 90px -10px #F59E0Bcc' : undefined,
       }}
     >
       {running && <div className="lane-sweep" />}
@@ -62,7 +62,7 @@ export function Lane({ lane }: { lane: LaneId }) {
           <AnimatePresence>
             {l.flash && !rescue && (
               <motion.div key={l.flash} initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
-                className="absolute left-1/2 top-3 z-30 -translate-x-1/2 rounded-md border border-fail bg-fail/20 px-2 py-0.5 font-mono text-[11px] font-bold text-fail backdrop-blur">
+                className="absolute left-1/2 top-3 z-30 -translate-x-1/2 rounded-md border border-fail bg-[#2a0a12] px-2.5 py-0.5 font-mono text-[12px] font-bold text-fail">
                 POLICY VIOLATION {l.flash}
               </motion.div>
             )}
@@ -71,10 +71,6 @@ export function Lane({ lane }: { lane: LaneId }) {
           <RescueOverlay lane={lane} />
           <AnimatePresence>{l.bug && <BugReportCard key={l.verdictKey} bug={l.bug} onClose={() => patchLane(lane, { bug: undefined })} />}</AnimatePresence>
         </ShopFrame>
-        {lane === 'adapted' && burst > 0 && (
-          <motion.div key={burst} className="pointer-events-none absolute inset-0 z-30 rounded-[8px]" initial={{ opacity: 0.8 }} animate={{ opacity: 0 }} transition={{ duration: 1.1 }}
-            style={{ background: 'linear-gradient(100deg, transparent 20%, #22D3EE44 50%, transparent 80%)' }} />
-        )}
         {lane === 'adapted' && burst > 0 && <span key={`b${burst}`} className="pointer-events-none absolute left-1/2 top-1/2 z-30"><Burst color="#22D3EE" n={18} dist={120} /></span>}
       </div>
       {rescue ? <RescuePanel lane={lane} /> : <StepLog steps={l.steps} color={t.hex} idle={l.status === 'idle'} />}
