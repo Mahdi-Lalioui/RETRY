@@ -141,8 +141,8 @@ function VersionsTab({ data, reload }: { data: LabData; reload: () => Promise<vo
                         const def = METRICS.find((d) => d.key === k)!;
                         return (
                           <div key={k} className="rounded-lg bg-black/20 px-2.5 py-2">
-                            <div className="truncate text-[10px] uppercase tracking-[0.08em] muted">{def.label}</div>
-                            <div className="num mt-0.5 text-[16px] font-semibold">{def.fmt((m[k] as number | null) ?? null)}</div>
+                            <div className="min-h-[30px] text-[12px] font-medium leading-[15px] muted" title={def.label}>{SHORT[k] ?? def.label}</div>
+                            <div className="num mt-0.5 text-[18px] font-semibold">{def.fmt((m[k] as number | null) ?? null)}</div>
                           </div>
                         );
                       })}
@@ -544,3 +544,9 @@ function Progress({ done, total }: { done: number; total: number }) {
     </div>
   );
 }
+
+// Short stat labels for the version cards so nothing truncates at 1280px.
+const SHORT: Record<string, string> = {
+  verifiedSuccess: 'Success', bugRecall: 'Bug recall', falseAlarms: 'False alarms',
+  violationsPerRun: 'Violations / run', rescuesPer10: 'Rescues / 10', p50LatencyMs: 'p50 latency',
+};

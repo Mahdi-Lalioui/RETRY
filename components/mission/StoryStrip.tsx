@@ -10,6 +10,7 @@ import type { RuleId } from '@/lib/shop/state';
 import { describeAction } from '@/lib/agent/loop';
 import { on } from '@/lib/store/bus';
 import { Kbd } from '@/components/ui/Kbd';
+import { ImpactStrip } from './ImpactStrip';
 
 type Tone = 'idle' | 'run' | 'fail' | 'rescue' | 'mubit' | 'learn' | 'pass';
 interface Caption { step: string; text: React.ReactNode; tone: Tone; key: string }
@@ -74,10 +75,11 @@ export function StoryStrip() {
   const running = useMission((s) => s.running);
   useEffect(() => { if (running) setLastStamp(null); }, [running]);
   const state = useMission();
+  const scope = state.scope;
   const cap = derive(state, lastStamp); // fresh JSX each render; only key changes animate
   const color = TONE[cap.tone];
   return (
-    <div className="relative mt-2.5 flex h-[34px] shrink-0 items-center gap-3 overflow-hidden rounded-[10px] border px-3 2xl:h-[40px]"
+    <div className="story-strip relative mt-2.5 flex h-[34px] shrink-0 items-center gap-3 overflow-hidden rounded-[10px] border px-3 2xl:h-[40px]"
       style={{ borderColor: `${color}40`, background: `linear-gradient(90deg, ${color}14, #0D1016 40%)` }} aria-live="polite">
       <span className="flex shrink-0 items-center gap-2">
         <span className="h-1.5 w-1.5 rounded-full" style={{ background: color, boxShadow: `0 0 10px ${color}` }} />
@@ -87,11 +89,12 @@ export function StoryStrip() {
       <div className="relative min-w-0 flex-1">
         <AnimatePresence mode="popLayout" initial={false}>
           <motion.div key={cap.key} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} transition={{ type: 'spring', stiffness: 300, damping: 30 }}
-            className="truncate text-[13px] text-white/90 2xl:text-[15.5px]">
+            className="story-text truncate text-[13px] text-white/90 2xl:text-[15.5px]">
             {cap.text}
           </motion.div>
         </AnimatePresence>
       </div>
+      {scope === 'heldout' && <><span className="h-4 w-px shrink-0 bg-white/10" /><ImpactStrip /></>}
     </div>
   );
 }
