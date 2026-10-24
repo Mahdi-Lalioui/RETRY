@@ -60,7 +60,7 @@ function Stamp({ verdict, reduce }: { verdict: Verdict; reduce: boolean }) {
       {look.sub && (
         <motion.div
           initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.35 }}
-          className="mt-2 max-w-full truncate rounded-md bg-black/75 px-2 py-1 text-center font-mono text-[11px] text-white/85 backdrop-blur"
+          className="mt-2 max-w-full truncate rounded-md bg-black/75 px-2 py-1 text-center font-mono text-[11px] text-white/85"
         >
           {look.sub}
         </motion.div>
