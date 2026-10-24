@@ -77,6 +77,7 @@ export async function refreshStatus(jobId?: string | null): Promise<RefreshStatu
   const queued = await queuedCount();
   if (!v) return { phase: 'collecting', progress: Math.min(1, queued / needed), queued, needed, mode };
 
+  const wasTraining = v.status === 'training';
   if (v.status === 'training') {
     const info = await getMubit().refreshStatus(mode === 'mock' ? v.id : v.jobId ?? null);
     if (mode === 'real' && info?.status === 'ready') {
@@ -102,6 +103,12 @@ export async function refreshStatus(jobId?: string | null): Promise<RefreshStatu
   if (v.promoted && v.id === 'v1') return { phase: 'promoted', progress: 1, version: v, queued, needed, mode };
 
   // ---- evaluating ----
+  // Agent E: the poll on which training finishes reports 'evaluating' (eval not advanced yet), so the Training Ring
+  // visibly passes through "evaluating on 48 held-out runs" even on the instant mock.
+  if (wasTraining) {
+    const ce = await evalFor(v);
+    return { phase: 'evaluating', progress: 0, version: v, queued, needed, mode, eval: { done: 0, total: ce.total ?? 48, evalId: ce.id } };
+  }
   const prev = await repo.versions.current();
   const baseline = prev && prev.id !== v.id ? prev : null;
   let bEval = baseline ? await evalFor(baseline) : null;

@@ -22,3 +22,4 @@
 - [E] Live rescue after a violation restores the pre-action shop state (new bridge msg `retry:restore`) so the human picks the right element on the page where the model went wrong.
 - [E] Mock DECLINE regex matches "No gift wrap" (was unmatched → learned-R7 versions still clicked the first button, often "Add gift wrap").
 - [E] Mission tray on boot shows bootstrap corrections too, marked `source:'scripted'` on CorrectionView.
+- [E] Refresh status reports 'evaluating' on the poll where training finishes, so the ring shows training → evaluating → promoted on mock too.

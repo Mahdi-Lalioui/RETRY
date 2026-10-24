@@ -57,7 +57,7 @@ async function finish(runId: string, lane: LaneId, taskId: string, finalAction: 
     if (!state) return fallback;
     const v = await api<Verdict>('/api/agent/finish', { runId, lane, taskId, finalAction, finalState: state, stuck: finalAction === null });
     // A run that ended on a house-rule violation shows a violation verdict, not "stuck" (the judge's stuck flag wins server-side).
-    if (!finalAction && fallback.status === 'violation' && v.status === 'stuck') return { ...v, status: 'violation', reason: fallback.reason };
+    if (!finalAction && fallback.status === 'violation' && v.status === 'stuck') return { ...v, status: 'violation', reason: fallback.reason, violations: [...new Set([...v.violations, ...fallback.violations])].sort() as RuleId[] };
     return v;
   } catch { return fallback; }
 }
@@ -160,7 +160,8 @@ async function runLane(lane: LaneId, sig: AbortSignal) {
         if (S().rescue?.lane === lane) S().set({ rescue: null });
         check(sig);
         if (!rescue) {
-          stamp(lane, await finish(runId, lane, task.id, null, state, { status: newRule ? 'violation' : 'stuck', correct: false, reason: newRule ? `Broke house rule ${newRule} · rescue skipped` : 'Stuck · rescue skipped', violations: state.violations }));
+          const vs = newRule && !state.violations.includes(newRule) ? [...state.violations, newRule] : state.violations; // pre-violation state was restored
+          stamp(lane, await finish(runId, lane, task.id, null, state, { status: newRule ? 'violation' : 'stuck', correct: false, reason: newRule ? `Broke house rule ${newRule} · rescue skipped` : 'Stuck · rescue skipped', violations: vs }));
           return;
         }
         S().patchLane(lane, { status: 'running', flash: null });
@@ -419,8 +420,8 @@ export async function boot() {
   ]);
   const s = S();
   if (health) s.set({ health, mode: health.demoMode ? 'replay' : s.mode });
-  if (health?.demoMode) void startReplay();
   else s.set({ health: { mubit: 'down', db: 'unknown', demoMode: false } });
+  if (health?.demoMode) void startReplay();
   if (Array.isArray(versions)) {
     const v = latestPromoted(versions);
     if (v) s.set({ adapted: v });
