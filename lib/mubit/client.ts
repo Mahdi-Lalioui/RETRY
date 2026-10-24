@@ -39,12 +39,14 @@ export function toVersionInfo(x: unknown): ModelVersionInfo | null {
   const o = x as Record<string, unknown>;
   const id = (o.versionId ?? o.version_id ?? o.id ?? o.version) as string | undefined;
   if (!id) return null;
-  const st = String(o.status ?? 'ready').toLowerCase();
+  const st = String(o.status ?? '').toLowerCase().trim();
   return {
     versionId: String(id), label: String(o.label ?? o.name ?? id),
     createdAt: String(o.createdAt ?? o.created_at ?? new Date().toISOString()),
     examples: typeof o.examples === 'number' ? o.examples : typeof o.num_examples === 'number' ? o.num_examples : undefined,
-    status: /fail|error/.test(st) ? 'failed' : /train|run|pend|queue|build/.test(st) ? 'training' : 'ready',
+    // Only an explicit success can make an adapter eligible for evaluation.
+    status: /fail|error|cancel|reject|below.target/.test(st) ? 'failed'
+      : /^(ready|completed?|succeeded|success|passed|available)$/.test(st) ? 'ready' : 'training',
     progress: typeof o.progress === 'number' ? o.progress : undefined,
   };
 }
@@ -79,12 +81,25 @@ async function fetchJson(c: MubitConfig, url: string, init: { method: string; bo
 
 export function createRealClient(c: MubitConfig = cfg()): MubitClient {
   if (!c.baseUrl) throw new Error('[mubit] MUBIT_BASE_URL is required for the real client');
+  const officialApi = new URL(c.baseUrl).hostname === 'api.mubit.ai';
+  if (officialApi && c.providerKeyHeader && c.openaiApiKey) {
+    throw new Error('[mubit] Add provider credentials in the Mubit console; the API accepts only the Mubit key.');
+  }
   const defaultHeaders: Record<string, string> = {};
   if (c.providerKeyHeader && c.openaiApiKey) defaultHeaders[c.providerKeyHeader] = c.openaiApiKey;
   const oai = new OpenAI({ baseURL: c.baseUrl, apiKey: c.apiKey ?? 'missing', defaultHeaders, timeout: c.chatTimeoutMs, maxRetries: 1 });
 
   return {
     async chat(req: ChatReq): Promise<ChatRes> {
+      if (officialApi && req.versionId) {
+        throw new Error('[mubit] The public API does not support adapter inference. Compare adapter versions in the Mubit console; configure a confirmed adapter API to run them here.');
+      }
+      if (req.versionId && c.versionMode === 'console_pin') {
+        throw new Error('[mubit] A console pin cannot transmit a version identity. Configure a confirmed version model suffix or header before evaluating an adapter.');
+      }
+      if (req.versionId && c.versionMode === 'header' && !c.versionHeader) {
+        throw new Error('[mubit] MUBIT_VERSION_HEADER is required to transmit the requested version identity.');
+      }
       const model = resolveModel(c, req.model, req.versionId);
       const headers = versionHeaders(c, req.versionId);
       const t0 = performance.now();
@@ -113,7 +128,7 @@ export function createRealClient(c: MubitConfig = cfg()): MubitClient {
     },
 
     async submitFeedback(f: FeedbackReq) {
-      if (!c.feedbackUrl) { console.warn('[mubit] feedback skipped: MUBIT_FEEDBACK_URL not set'); return { feedbackId: null }; }
+      if (!c.feedbackUrl) throw new Error('[mubit] MUBIT_FEEDBACK_URL is not configured. The public API does not document correction submission; feedback has not been sent.');
       const t0 = Date.now();
       const r = (await fetchJson(c, c.feedbackUrl, { method: 'POST', body: toFeedbackPayload(f) }, 2)) as Record<string, unknown>;
       const id = (r.feedbackId ?? r.feedback_id ?? r.id ?? null) as string | null;
@@ -122,6 +137,7 @@ export function createRealClient(c: MubitConfig = cfg()): MubitClient {
     },
 
     async requestRefresh() {
+      if (!c.refreshUrl && !c.versionsUrl) throw new Error('[mubit] Configure a confirmed MUBIT_REFRESH_URL or MUBIT_VERSIONS_URL to track model updates. Public adapter training is managed in the Mubit console.');
       if (!c.refreshUrl) return { jobId: null, mode: 'automatic' as const };
       const r = (await fetchJson(c, c.refreshUrl, { method: 'POST', body: {} })) as Record<string, unknown>;
       const jobId = (r.jobId ?? r.job_id ?? r.id ?? null) as string | null;
@@ -131,13 +147,12 @@ export function createRealClient(c: MubitConfig = cfg()): MubitClient {
 
     async refreshStatus(jobId: string | null) {
       if (c.refreshUrl && jobId) {
-        try {
-          const r = await fetchJson(c, `${c.refreshUrl.replace(/\/+$/, '')}/${encodeURIComponent(jobId)}`, { method: 'GET' });
-          const v = toVersionInfo(r); if (v) return v;
-        } catch (e) { console.warn(`[mubit] refreshStatus failed: ${(e as Error).message}`); }
+        const r = await fetchJson(c, `${c.refreshUrl.replace(/\/+$/, '')}/${encodeURIComponent(jobId)}`, { method: 'GET' });
+        // An explicit job lookup must never fall back to an unrelated version.
+        return toVersionInfo(r);
       }
       const vs = await this.listVersions();
-      return vs.length ? vs[vs.length - 1] : null;
+      return vs.sort((a, b) => Date.parse(a.createdAt) - Date.parse(b.createdAt)).at(-1) ?? null;
     },
 
     async listVersions() {

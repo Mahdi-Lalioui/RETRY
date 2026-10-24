@@ -19,6 +19,18 @@ const done: AgentAction = { type: 'done', reason: 'x' };
 const report: AgentAction = { type: 'report_bug', reason: 'x' };
 
 describe('oracle with bugs', () => {
+  it.each(BUG_IDS)('does not reward reporting %s before it is observable', (bug) => {
+    const state = initialState(42, 1, [bug]);
+    expect(judge(getTask('T2'), state, report)).toMatchObject({ status: 'failed', correct: false });
+  });
+
+  it('credits the bug actually observed when several bugs are injected', () => {
+    const state = run(getTask('T2'), initialState(42, 1, ['no_order_id', 'coupon_500'])).state;
+    const verdict = judge(getTask('T2'), state, report);
+    expect(verdict).toMatchObject({ status: 'bug_reported', correct: true });
+    expect(verdict.reason).toContain('Coupon crashes checkout');
+  });
+
   const tasksFor = (b: BugId) => (b === 'coupon_500' ? TASKS.filter((t) => t.wantsCoupon) : TASKS);
   for (const bug of BUG_IDS) {
     for (const seed of [3, 58, 140]) {

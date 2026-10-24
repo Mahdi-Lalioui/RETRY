@@ -40,6 +40,7 @@ export function RescueOverlay({ lane }: { lane: LaneId }) {
       if (e.key === 'Escape') { e.preventDefault(); e.stopImmediatePropagation(); resolveRescue(lane, null); return; }
       if (e.key === 'Enter' && cur.picked) {
         e.preventDefault(); e.stopImmediatePropagation();
+        if ((cur.picked.role === 'textbox' || cur.picked.role === 'select') && !cur.value.trim()) return;
         resolveRescue(lane, { pick: cur.picked, value: cur.value, rule: cur.rule, ruleText: cur.otherText });
         return;
       }
@@ -103,12 +104,12 @@ export function RescuePanel({ lane }: { lane: LaneId }) {
                 <span className="truncate text-rescue/80 animate-pulse-slow">+ click the right element in the shop ↑</span>
               )}
             </div>
-            {rescue.picked?.role === 'textbox' && (
+            {(rescue.picked?.role === 'textbox' || rescue.picked?.role === 'select') && (
               <input
                 autoFocus
                 value={rescue.value}
                 onChange={(e) => patch({ value: e.target.value })}
-                placeholder={`value for “${rescue.picked.label}” (e.g. NIGHTSHIFT)`}
+                placeholder={rescue.picked.role === 'select' ? `value for “${rescue.picked.label}” (1–5)` : `value for “${rescue.picked.label}” (e.g. NIGHTSHIFT)`}
                 className="mt-1.5 h-7 w-full rounded-md border border-rescue/40 bg-black/50 px-2 font-mono text-[12px] text-white outline-none placeholder:text-white/30 focus:border-rescue"
               />
             )}

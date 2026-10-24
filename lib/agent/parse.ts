@@ -44,6 +44,9 @@ export function parseAction(raw: string, validIds: string[]): { action: AgentAct
     if (!target) return { action: null, error: 'missing target', badTarget: '' };
     if (!validIds.includes(target)) return { action: null, error: `target "${target}" not in snapshot`, badTarget: target };
   }
+  if ((d.type === 'type' || d.type === 'select') && d.value === undefined) {
+    return { action: null, error: `missing value for ${d.type}` };
+  }
   return { action };
 }
 

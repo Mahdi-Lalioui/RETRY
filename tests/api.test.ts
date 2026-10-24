@@ -46,9 +46,9 @@ describe('API routes (mock + memory)', () => {
     expect(r.status).toBe(400); expect((await json(r)).ok).toBe(false);
   });
 
-  it('[G] step with a malformed state does not 500', async () => {
+  it('[G] step with a malformed state is rejected cleanly (400, not 500)', async () => {
     const r = await step(post({ ...stepBody('base', 'run_junk'), state: { junk: true } }));
-    expect(r.status).toBe(200);
+    expect(r.status).toBe(400); expect((await json(r)).ok).toBe(false);
   });
 
   it('rescue → refresh → promoted version declines the upsell', async () => {
@@ -85,7 +85,7 @@ describe('API routes (mock + memory)', () => {
   });
 
   it('finish runs the oracle on the final state', async () => {
-    const state = initialState(9001, 1, ['total_nan']);
+    const state = { ...initialState(9001, 1, ['total_nan']), page: 'checkout' as const, openModals: [], shipping: 'collect' as const };
     const r = await json(await finish(post({ runId: 'run_a', lane: 'base', taskId: 'T1', finalAction: { type: 'report_bug', reason: 'NaN' }, finalState: state })));
     expect(r.data).toMatchObject({ status: 'bug_reported', correct: true });
     const m = await json(await metrics(get('?scope=live')));

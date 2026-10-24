@@ -35,6 +35,15 @@
 - [E] Mission tray on boot shows bootstrap corrections too, marked `source:'scripted'` on CorrectionView.
 - [E] Refresh status reports 'evaluating' on the poll where training finishes, so the ring shows training → evaluating → promoted on mock too.
 
+## Verification pass — 24 October 2026
+- Work in the fresh user-requested clone on main; preserve the existing design and fix reproduced correctness/reliability failures.
+- Keep provider failures as failed evaluation trials and block promotion on infrastructure errors, incomplete coverage or missing/invalid metrics.
+- Credit bug reports only after observable regression evidence, not hidden injection flags.
+- Treat only seeded v1 as the baseline; preserve remote adapter identity independently of example counts and reject unaddressable versions.
+- Resolve lane models from server configuration, validate shop/action HTTP inputs, and load .env.local for CLI scripts.
+- Official Mubit uses its mbt_ key, /openai/v1 provider proxy and x-middleware-request-id; provider secrets are not forwarded.
+- Local correction persistence means queued, not delivered; reconcile delivery status before showing sent or trained.
+- Keep the full learning demo labelled mock until open provider access and confirmed feedback/adapter-serving contracts exist.
 ## Agent H
 - [H] Mubit impact strip sits on the right of the story strip (held-out scope only, hidden during a rescue). Every number comes from the existing scoreboard rows. Cost shows GPT $/run next to "RETRY on own credits" because RETRY's cost is null, so no "× cheaper" figure is shown.
 - [H] Version rail (v1→vN chips, +rules learned vs the previous ready version) sits under the training ring. It reads /api/versions through a component hook; the popover shows only stored held-out metrics.

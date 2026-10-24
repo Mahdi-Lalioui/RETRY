@@ -7,6 +7,7 @@ import { getMubit, mubitMode } from '@/lib/mubit';
 import { cfg } from '@/lib/mubit/config';
 import { advanceEval, finalMetrics, isFinished, latestFinished, startEval, type EvalConfig } from '@/lib/eval/runner';
 import { gate } from '@/lib/eval/gate';
+import { suiteItems } from '@/lib/eval/suite';
 
 export type RefreshPhase = 'collecting' | 'training' | 'evaluating' | 'promoted' | 'held_back';
 export interface GateDecision { pass: boolean; reasons: string[]; headline: string; comparedTo: string | null }
@@ -21,21 +22,29 @@ export interface RefreshStatus {
 export async function startRefresh(): Promise<{ jobId: string | null; mode: 'explicit' | 'automatic'; versionId: string; skipped?: string }> {
   // [G] A version trained on zero new corrections is a duplicate (and costs a real Mubit job): refuse it.
   const training = (await repo.versions.list({ status: 'training' }))[0];
-  if (!training && (await queuedCount()) === 0) {
+  if (!training && mubitMode() === 'mock' && (await queuedCount()) === 0) {
     const cur = await repo.versions.current();
     return { jobId: null, mode: 'automatic', versionId: cur?.id ?? 'v1', skipped: 'No new corrections since the last version' };
   }
   const mubit = getMubit();
-  const r = await mubit.requestRefresh();
-  if (mubitMode() === 'mock' && r.jobId) return { ...r, versionId: r.jobId }; // mock created the row itself
-  // Real Mubit: track the version in our DB (mubitVersionId filled when Mubit reports it ready).
+  const mode = mubitMode();
   const existing = (await repo.versions.list({ status: 'training' }))[0];
-  if (existing) return { ...r, versionId: existing.id };
-  const all = await repo.corrections.list();
+  if (existing) return { jobId: existing.jobId, mode: existing.jobId ? 'explicit' : 'automatic', versionId: existing.id };
+  const all = (await repo.corrections.list()).filter((c) => c.status === 'sent' || c.status === 'trained');
+  if (mode === 'real' && !all.some((c) => c.status === 'sent' && !c.versionId)) {
+    throw new Error('No new corrections have been delivered to Mubit. Wait for feedback submission or retry failed corrections before refreshing.');
+  }
+  // Automatic refresh has no job identity. Snapshot the remote versions before triggering it,
+  // so an old ready adapter cannot be mistaken for the result of this request.
+  const knownVersions = mode === 'real' ? await mubit.listVersions() : [];
+  const r = await mubit.requestRefresh();
+  if (mode === 'mock' && r.jobId) return { ...r, versionId: r.jobId }; // mock created the row itself
+  // Real Mubit: track the version in our DB (mubitVersionId filled when Mubit reports it ready).
   const label = await nextVersionLabel();
   const v = await repo.versions.insert({
     id: `ver_${label}_${nanoid(4)}`, label, baseModel: cfg().openBaseModel, examples: all.length, status: 'training',
     rules: learnedFromCorrections(all), jobId: r.jobId, createdAt: new Date(),
+    metrics: { refresh: { existingVersionIds: knownVersions.map((v) => v.versionId), correctionIds: all.map((c) => c.id) } },
   });
   return { ...r, versionId: v.id };
 }
@@ -44,19 +53,27 @@ async function queuedCount(): Promise<number> {
   return (await repo.corrections.list()).filter((c) => !c.versionId).length;
 }
 
-/** Eval config for a version: v1 / zero-example versions are the base model. */
+/** Only the seeded v1 is the base model; every candidate must evaluate its adapter. */
 export function versionEvalConfig(v: ModelVersion): EvalConfig {
-  const base = (v.examples ?? 0) === 0;
+  const base = v.id === 'v1';
   return { lane: base ? 'base' : 'adapted', versionId: v.id, suite: 'heldout', label: v.label, examples: v.examples ?? 0 };
 }
 
 /** Finished or in-progress held-out eval for a version; starts one if none exists. */
 async function evalFor(v: ModelVersion): Promise<Eval> {
-  const done = await latestFinished({ versionId: v.id, suite: 'heldout' });
-  if (done) return done;
+  const config = versionEvalConfig(v);
+  const items = suiteItems(config.suite);
+  const bugRuns = items.filter((item) => item.bugs.length).length;
+  const done = await latestFinished({ lane: config.lane, versionId: v.id, suite: config.suite });
+  const metrics = finalMetrics(done);
+  if (done && metrics && done.total === items.length && metrics.suite === config.suite
+    && metrics.config?.lane === config.lane && metrics.config?.versionId === v.id
+    && metrics.runs === items.length && metrics.bugRuns === bugRuns && metrics.healthyRuns === items.length - bugRuns) return done;
   const running = (await repo.evals.list({ versionId: v.id }))
-    .find((e) => !isFinished(e) && (e.metrics as { config?: EvalConfig } | null)?.config?.suite === 'heldout');
-  return running ?? startEval(versionEvalConfig(v));
+    .find((e) => !isFinished(e) && e.lane === config.lane && e.total === items.length
+      && (e.metrics as { config?: EvalConfig } | null)?.config?.suite === config.suite
+      && (e.metrics as { config?: EvalConfig } | null)?.config?.versionId === v.id);
+  return running ?? startEval(config);
 }
 
 /** Make sure a version has a finished held-out eval (baselines, scripts). */
@@ -70,7 +87,7 @@ export async function ensureVersionEval(v: ModelVersion): Promise<Eval> {
   return ev;
 }
 
-type VMetrics = { gate?: GateDecision } | null;
+type VMetrics = { gate?: GateDecision; refresh?: { existingVersionIds?: string[]; correctionIds?: string[] } } | null;
 
 export async function refreshStatus(jobId?: string | null): Promise<RefreshStatus> {
   const c = cfg();
@@ -82,13 +99,24 @@ export async function refreshStatus(jobId?: string | null): Promise<RefreshStatu
   if (!v) v = all.filter((x) => x.status === 'ready' && !x.promoted && !x.heldBackReason && !(x.metrics as VMetrics)?.gate && x.id !== 'v1').pop();
   const queued = await queuedCount();
   if (!v) return { phase: 'collecting', progress: Math.min(1, queued / needed), queued, needed, mode };
+  if (mode === 'real' && v.id !== 'v1' && (v.examples ?? 0) <= 0) {
+    v = (await repo.versions.update(v.id, { status: 'failed', heldBackReason: 'No delivered correction examples were recorded for this model update' })) ?? v;
+    return { phase: 'held_back', progress: 1, version: v, queued, needed, mode };
+  }
 
   const wasTraining = v.status === 'training';
   if (v.status === 'training') {
-    const info = await getMubit().refreshStatus(mode === 'mock' ? v.id : v.jobId ?? null);
+    let info = await getMubit().refreshStatus(mode === 'mock' ? v.id : v.jobId ?? null);
+    if (mode === 'real' && info) {
+      const known = (v.metrics as VMetrics)?.refresh?.existingVersionIds;
+      const used = all.some((x) => x.id !== v!.id && x.mubitVersionId === info!.versionId);
+      // A legacy automatic job with no recorded snapshot cannot safely identify its result.
+      if (known?.includes(info.versionId) || used || (!v.jobId && !known)) info = null;
+    }
     if (mode === 'real' && info?.status === 'ready') {
       v = (await repo.versions.update(v.id, { status: 'ready', readyAt: new Date(), mubitVersionId: info.versionId })) ?? v;
-      for (const x of (await repo.corrections.list()).filter((y) => !y.versionId && new Date(y.createdAt ?? 0) <= new Date(v!.createdAt ?? 0))) {
+      const submitted = new Set((v.metrics as VMetrics)?.refresh?.correctionIds ?? []);
+      for (const x of (await repo.corrections.list()).filter((y) => !y.versionId && y.status === 'sent' && submitted.has(y.id))) {
         await repo.corrections.update(x.id, { status: 'trained', versionId: v.id });
       }
     } else if (mode === 'real' && info?.status === 'failed') {

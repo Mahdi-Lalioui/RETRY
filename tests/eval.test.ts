@@ -1,11 +1,12 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { assertDisjointPools, heldoutSuite, seedPool, smokeSuite, TRAINING_SEEDS, HELDOUT_SEEDS, JUDGE_SEED_MIN } from '@/lib/eval/suite';
-import { runEval, finalMetrics } from '@/lib/eval/runner';
+import { runEval, startEval, evalConfig, finalMetrics } from '@/lib/eval/runner';
 import { resetMemoryRepo } from '@/lib/db';
 import { getTask } from '@/lib/shop/tasks';
 import { bugsAffecting } from '@/lib/shop/bugs';
 import { refreshStatus } from '@/app/api/_lib/refresh';
 import { ensureBootstrap, resetBootstrapCache } from '@/lib/train/bootstrap';
+import { getMubit } from '@/lib/mubit';
 
 process.env.MOCK_LATENCY_SCALE = '1'; // eval must be fast regardless (withMockFast)
 process.env.MUBIT_ENABLED = 'false';
@@ -36,6 +37,52 @@ describe('held-out suite (§13.1)', () => {
 
 describe('eval on mock', () => {
   beforeEach(() => { resetMemoryRepo(); resetBootstrapCache(); });
+  afterEach(() => { vi.restoreAllMocks(); });
+
+  it('rejects an unknown pinned version instead of evaluating the promoted model under its name', async () => {
+    const repo = resetMemoryRepo();
+    await expect(startEval({ lane: 'adapted', versionId: 'missing-version', suite: 'heldout' })).rejects.toThrow(/unknown version/i);
+    expect(await repo.evals.list()).toHaveLength(0);
+  });
+
+  it.each(['training', 'failed'])('rejects a %s candidate before evaluation', async (status) => {
+    const repo = resetMemoryRepo();
+    await repo.versions.insert({ id: 'candidate', label: 'v2', baseModel: 'open-base', examples: 9, status });
+    await expect(startEval({ lane: 'adapted', versionId: 'candidate', suite: 'heldout' })).rejects.toThrow(/ready/i);
+  });
+
+  it('pins a canonical ready version even when the caller uses the remote adapter id', async () => {
+    const repo = resetMemoryRepo();
+    await repo.versions.insert({ id: 'candidate', mubitVersionId: 'remote-adapter', label: 'v2', baseModel: 'open-base', examples: 9, status: 'ready' });
+    const ev = await startEval({ lane: 'adapted', versionId: 'remote-adapter', suite: 'heldout' });
+    expect(ev.versionId).toBe('candidate');
+    expect(evalConfig(ev)?.versionId).toBe('candidate');
+    expect((await startEval({ lane: 'base', versionId: 'v1', suite: 'smoke' })).versionId).toBe('v1');
+    await expect(startEval({ lane: 'base', versionId: 'candidate', suite: 'heldout' })).rejects.toThrow(/base/i);
+    await expect(startEval({ lane: 'closed', versionId: 'candidate', suite: 'heldout' })).rejects.toThrow(/lane/i);
+    await expect(startEval({ lane: 'icl', versionId: 'candidate', suite: 'heldout' })).rejects.toThrow(/lane/i);
+  });
+
+  it('pins the current adapted version at evaluation start', async () => {
+    const repo = resetMemoryRepo();
+    await repo.versions.insert({ id: 'current', label: 'v2', baseModel: 'open-base', examples: 9, status: 'ready' });
+    await repo.versions.promote('current');
+    expect((await startEval({ lane: 'adapted', versionId: null, suite: 'heldout' })).versionId).toBe('current');
+  });
+
+  it('counts model call failures as failed runs in every suite denominator', async () => {
+    const repo = resetMemoryRepo();
+    vi.spyOn(getMubit(), 'chat').mockRejectedValue(new Error('Provider unavailable'));
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    const ev = await runEval({ lane: 'base', versionId: 'v1', suite: 'heldout' });
+    const metrics = finalMetrics(ev)!;
+    expect(ev.done).toBe(48);
+    expect(metrics).toMatchObject({ runs: 48, healthyRuns: 32, bugRuns: 16, verifiedSuccess: 0, bugRecall: 0, evaluationErrors: 48 });
+    const runs = await repo.runs.list({ evalId: ev.id });
+    expect(runs).toHaveLength(48);
+    expect(runs.every((r) => r.status === 'failed' && r.correct === false)).toBe(true);
+    expect(runs.every((r) => r.reason?.includes('Provider unavailable'))).toBe(true);
+  });
 
   it('base v1 < version with all rules on verified success; runs fast', async () => {
     const repo = resetMemoryRepo();

@@ -1,5 +1,6 @@
 // plan §12.3 — build the scripted overnight backlog + v2/v3/v4 with held-out evals (same as POST /api/demo/bootstrap).
 // In-memory DB unless DATABASE_URL is set (then it writes to Neon). Usage: npm run seed:corrections
+import './env';
 import { ensureBootstrap } from '@/lib/train/bootstrap';
 import { repo } from '@/lib/db';
 

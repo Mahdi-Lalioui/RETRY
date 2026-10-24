@@ -2,6 +2,8 @@
 
 **The AI QA tester that learns your team's testing rules from every human rescue.** Built for Night Shift: Mubit Hackathon, London.
 
+**Verified 24 October 2026:** the production build and regression suite pass; a real `gpt-4o-mini` agent step through Mubit returned a tracked `mreq_` call and a valid JSON action. The complete rescue → refresh → promotion demo is verified in **labelled mock mode**. Live open-model access and adapter serving still require the integration details below. See [VERIFICATION.md](VERIFICATION.md) for fixes, evidence and remaining limits.
+
 > Self-healing tools guess. RETRY learns your rules from every rescue, and still knows a redesign from a real bug. Every call goes through Mubit, and every rescue becomes a model update.
 
 ## The problem
@@ -42,11 +44,20 @@ See `plan.md` for the full spec.
 npm ci
 cp .env.example .env.local   # fill in keys; leave MUBIT_ENABLED=false for mock mode
 npm run dev                  # http://localhost:3000
-npm test                     # 208 tests
+npm test                     # regression suite
 npm run smoke:mubit          # checks the configured Mubit endpoints
 ```
 To deploy and to switch to real Mubit, see `MORNING.md`.
 
+For a live inference check that does not assume a training API:
+```bash
+npm run smoke:mubit -- --require-real --inference-only --lane closed
+```
+CLI scripts load `.env.local`, just like Next.js. Keep credentials there, never in source control. Use `MUBIT_ENABLED=false npm run dev` for a full mock rehearsal while retaining your real credentials locally.
+
 ## Limitations
 - The agent reads a semantic text snapshot of our own shop. On real sites, that snapshot would come from an accessibility tree or Playwright.
-- Mubit Middleware's API details were not public. They are env-driven (`TODO(MUBIT)` in `.env.example`).
+- [Mubit's public API](https://docs.mubit.ai/reference/api) uses `https://api.mubit.ai/openai/v1`, an `mbt_` key, and `x-middleware-request-id`. Provider keys belong in the Mubit console. Public Mubit rejects forwarded provider credentials.
+- The [documented model API](https://docs.mubit.ai/guides/model-ids) cannot serve an adapter by naming it as a model. Adapter comparisons are console-managed. The app requires confirmed feedback, refresh, version and adapter-serving endpoints before its full learning loop can run live. Missing configuration produces an error instead of a false success.
+- `OPEN_BASE_MODEL=open-base` is a mock placeholder. Configure a served open model and provider access before using real Base/RETRY/ICL lanes. The verified account returned `provider_key_missing` for Groq and OpenRouter.
+- Without `DATABASE_URL`, corrections and runs live in process memory. Use Neon for durable shared data on Vercel.

@@ -34,12 +34,11 @@ function Clock() {
 
 function MubitPill() {
   const health = useMission((s) => s.health);
-  const n = useMission((s) => (s.iclOn ? 4 : 3));
   const mode = health.mubit;
   const cfg =
     mode === 'mock' ? { dot: '#FACC15', text: 'MOCK MODE', sub: 'mock model client · not real Mubit', cls: 'border-yellow-400/40 bg-yellow-400/10 text-yellow-300' }
       : mode === 'down' ? { dot: '#F43F5E', text: 'MUBIT UNREACHABLE', sub: 'check /api/health', cls: 'border-fail/40 bg-fail/10 text-fail' }
-        : mode === 'ok' ? { dot: '#34D399', text: `routed via Mubit · ${n} lanes`, sub: 'every LLM call goes through Mubit middleware', cls: 'border-white/10 bg-white/[0.04] text-white/80' }
+        : mode === 'ok' ? { dot: '#34D399', text: 'Mubit configured', sub: 'live requests use Mubit; model and adapter availability depend on the configured integration', cls: 'border-white/10 bg-white/[0.04] text-white/80' }
           : { dot: '#7A8597', text: 'connecting…', sub: '', cls: 'border-white/10 bg-white/[0.03] text-white/50' };
   return (
     <Tooltip label={cfg.sub} side="bottom">

@@ -1,5 +1,13 @@
 # Good morning: what to do first
 
+## Verification update — 24 October
+
+The follow-up audit verified the actual OpenAI and Mubit credentials locally and made successful real `gpt-4o-mini` calls through Mubit, including `/api/agent/step`. Keys are saved only in ignored `.env.local` and are not included in this repository. Run `npm run smoke:mubit -- --require-real --inference-only --lane closed` to repeat that check.
+
+For the complete stage flow, use `MUBIT_ENABLED=false npm run dev`: the simulated learning lifecycle is explicitly labelled MOCK MODE. The current account has no Groq/OpenRouter key, and the public Mubit API does not expose adapter inference by model/version ID. Obtain confirmed hackathon endpoints for feedback, refresh, versions and adapter serving before presenting that flow as live. See [VERIFICATION.md](VERIFICATION.md).
+
+The sections below retain the original handover context; this update supersedes claims that current Mubit API documentation is unavailable or that environment values alone guarantee live training.
+
 The full app is built, tested locally, and pushed to `main`. Tonight it ran on the **mock Mubit client**, because this sandbox had no network access to Mubit or OpenAI. The TopBar shows a yellow **MOCK MODE** pill until real Mubit is configured.
 
 ## 1. Run it locally (2 min)

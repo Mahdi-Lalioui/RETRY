@@ -4,6 +4,8 @@
 > Night Shift: Mubit Hackathon, London. Hacking: Fri 23 Oct 19:30 → Code freeze Sun 25 Oct 10:00.
 > Stack: Next.js (App Router, TypeScript) full-stack, deployed on Vercel. All LLM calls routed through Mubit.
 
+> Verification update, 24 Oct 2026: this plan describes the intended product. Real Mubit inference is now verified, but live feedback and adapter serving require confirmed event-specific APIs; the public API supports console adapter comparisons only. The full learning lifecycle remains a labelled mock rehearsal. Current evidence and limits: [VERIFICATION.md](VERIFICATION.md).
+
 This file is the single source of truth. Every Claude Code agent working on this repo MUST read it fully before writing code, and MUST NOT deviate from the contracts in §5 without updating this file first.
 
 ---
@@ -467,7 +469,7 @@ Each task defines expected cart contents; the oracle checks them.
 ### 8.6 Oracle (`lib/shop/oracle.ts`)
 `judge(task, finalState, finalAction): Verdict`
 - If bug active:
-  - `report_bug` → correct (`bug_reported`).
+  - `report_bug` → correct (`bug_reported`) only after its visible evidence is present: dead pay attempt, NaN total, missing confirmation ID, or coupon error page. Hidden injection flags alone earn no credit.
   - `done` → incorrect (`failed`, "Passed a broken checkout").
 - If no bug:
   - `done` + valid order (orderId present, cart matches task, coupon/shipping/payment per rules, zero violations) → `passed`, correct.
@@ -603,6 +605,13 @@ Deterministic fake: base lane picks plausible-but-wrong actions on rule moments 
 If Middleware only learns from outcomes, also send `recordOutcome` / step outcome via `@mubit-ai/sdk` (signal −1 on bad step with `directive_hint` = correction text; +1 on passing runs). Enabled by `MUBIT_MEMORY_FALLBACK=true`. Do not claim on stage unless used.
 
 ### 11.5 Confirmed Mubit facts (fill in during the event)
+Verified 24 Oct against [the public API reference](https://docs.mubit.ai/reference/api) and live requests:
+- OpenAI-compatible proxy: `https://api.mubit.ai/openai/v1`, Bearer `mbt_` key, call identity `x-middleware-request-id` (`mreq_…`). Real `gpt-4o-mini` JSON actions succeeded through both the client and the step route.
+- Provider credentials belong in the Mubit console; sending them alongside the Mubit key is rejected. The current project returned `provider_key_missing` for Groq/OpenRouter model lists.
+- [Model IDs](https://docs.mubit.ai/guides/model-ids) pass through unchanged. The public API cannot address an adapter as a model; comparison is in the console. Feedback/refresh/version routes and custom adapter addressing below remain unconfirmed hackathon-specific integration points.
+- Unknown status values do not mean ready; missing feedback configuration does not mean sent. Training uses a fixed snapshot of submitted corrections, and only a fresh remote version can complete a refresh.
+
+Historical offline findings follow; they are not a confirmed Middleware contract:
 Discovered offline from `@mubit-ai/sdk@0.13.2` (npm), Fri 23 Oct — NOT yet confirmed with Mubit team:
 - Memory/control plane: `https://api.mubit.ai`, HTTP routes `/v2/control/*` (e.g. `/v2/control/outcome`, `/v2/control/step_outcome`, `/v2/control/feedback`, `/v2/control/prompt/versions`, `/v2/control/prompt/optimize`), auth `Authorization: Bearer <MUBIT_API_KEY>`.
 - SDK also wraps OpenAI clients (`@mubit-ai/sdk/learn`), and has versioned prompts/skills with activate/diff (candidate → active).
@@ -667,6 +676,8 @@ Uses `lib/shop/engine` + `lib/agent/policy` directly (`sim.ts`). Concurrency `EV
 
 ### 13.4 Promotion gate (`lib/eval/gate.ts`)
 New version promoted to the Adapted lane only if `success >= prev.success` AND `bugRecall >= prev.bugRecall - 0.0` AND `falseAlarms <= prev.falseAlarms + 1`. Otherwise badge shows **"HELD BACK — regression on bug detection"** (red outline) and the previous version stays. Rollback button in /lab.
+
+Verification hardening: missing/invalid metrics, incomplete suite coverage, a missing baseline, or any provider/evaluation infrastructure error blocks promotion. Failed trials stay in the denominator. Only the seeded `v1` is the base model; an adapter retains its identity regardless of its example count. Manual activation permits only `v1` or a version already approved by this gate.
 
 ---
 

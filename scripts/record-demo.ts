@@ -1,5 +1,6 @@
 // plan §19 — record public/demo/session-default.json by running the SIMULATOR (honestly labelled "simulator run",
 // "simulated timings", "mock model" when on the mock). Usage: npm run record:demo [-- out.json]
+import './env';
 import { writeFileSync, mkdirSync } from 'node:fs';
 import path from 'node:path';
 import type { LaneId, Verdict } from '@/lib/agent/types';

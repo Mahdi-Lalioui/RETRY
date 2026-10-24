@@ -4,7 +4,6 @@ import { useEffect, useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import type { LaneId } from '@/lib/agent/types';
 import { useMission, type MissionState } from '@/lib/store/mission';
-import { LANE_THEME } from '@/lib/store/lanes';
 import { RULES } from '@/lib/shop/rules';
 import type { RuleId } from '@/lib/shop/state';
 import { describeAction } from '@/lib/agent/loop';
@@ -42,7 +41,7 @@ function derive(s: MissionState, lastStamp: LaneId | null): Caption {
   if (flying) {
     return {
       step: 'Capture', tone: 'mubit', key: `fly-${flying.id}`,
-      text: <>Rescue captured → sent to <b className="text-mubit">Mubit</b> as the preferred output for that exact call, re-rendered on <b>{flying.augmented || 8}</b> more training layouts.</>,
+      text: <>Rescue captured → queued for <b className="text-mubit">Mubit</b> as the preferred output for that exact call, re-rendered on <b>{flying.augmented}</b> more training layouts.</>,
     };
   }
   // 3. Training lifecycle

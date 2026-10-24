@@ -1,7 +1,6 @@
 import { z } from 'zod';
 import { liveScoreboard } from '@/lib/db/queries';
 import { ensureBaselines, heldoutBoard } from '@/lib/eval/board';
-import { isFinished } from '@/lib/eval/runner';
 import { repo } from '@/lib/db';
 import { errorResponse, ok, parseQuery } from '../_lib/http';
 
@@ -21,7 +20,7 @@ export async function GET(req: Request) {
     };
     if (q.data.scope === 'live') return ok({ scope: 'live' as const, rows: await liveScoreboard(), curve: [], totals });
     // Agent D: baselines (GPT + Base v1) are evaluated lazily so the held-out scoreboard is never empty.
-    if (!(await repo.evals.list()).some(isFinished)) await ensureBaselines();
+    await ensureBaselines();
     const h = await heldoutBoard();
     return ok({ scope: 'heldout' as const, rows: h.rows, curve: h.curve, icl: h.icl, totals });
   } catch (e) { return errorResponse(e); }

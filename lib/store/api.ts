@@ -1,10 +1,10 @@
 // Fetch helpers for the `{ok:true,data}|{ok:false,error}` envelope (plan §16).
-/** [G] A cold start / redeploy drops connections for ~1 s: retry network errors and gateway 502/503/504 twice. */
+/** [G] A cold start / redeploy drops connections for ~1 s: retry network errors and gateway 502/504 twice (503 carries an app error envelope). */
 async function fetchRetry(path: string, init: RequestInit, signal?: AbortSignal): Promise<Response> {
   for (let attempt = 0; ; attempt++) {
     try {
       const res = await fetch(path, init);
-      if (attempt < 2 && (res.status === 502 || res.status === 503 || res.status === 504)) throw new TypeError(`HTTP ${res.status}`);
+      if (attempt < 2 && (res.status === 502 || res.status === 504)) throw new TypeError(`HTTP ${res.status}`);
       return res;
     } catch (e) {
       if (signal?.aborted || attempt >= 2 || !(e instanceof TypeError)) throw e;

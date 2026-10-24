@@ -49,23 +49,29 @@ export function installBridge(host: BridgeHost): () => void {
   let highlight = false;
   let queue: Promise<void> = Promise.resolve();
   let lastCursor = { x: 640, y: 400 };
+  let generation = 0;
+  let disposed = false;
 
   const reply = (state: ShopState) => ({ state, layoutTag: state.layout.layoutTag });
 
-  async function moveTo(el: Element): Promise<void> {
+  async function moveTo(el: Element, current: () => boolean): Promise<void> {
     el.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
     await sleep(180);
+    if (!current()) return;
     const r = el.getBoundingClientRect();
     const x = Math.round(r.left + Math.min(r.width / 2, 60 + r.width / 4));
     const y = Math.round(r.top + r.height / 2);
     lastCursor = { x, y };
     post({ type: 'retry:cursor', x, y });
     await sleep(380);
+    if (!current()) return;
     post({ type: 'retry:cursor', x, y, pressed: true });
     await sleep(120);
   }
 
-  async function runAct(reqId: string | undefined, action: AgentAction): Promise<void> {
+  async function runAct(reqId: string | undefined, action: AgentAction, mine: number): Promise<void> {
+    const current = () => !disposed && mine === generation;
+    if (!current()) { if (!disposed) post({ type: 'retry:act:res', reqId, result: 'error', ...reply(host.getState()) }); return; }
     let state = host.getState();
     let result: StepResult = 'ok';
     let semKey: string | undefined;
@@ -75,30 +81,36 @@ export function installBridge(host: BridgeHost): () => void {
         await sleep(300);
       } else if (action.type === 'click' || action.type === 'type' || action.type === 'select') {
         const el = action.target ? document.querySelector(`[data-agent-id="${action.target}"]`) : null;
-        if (el) await moveTo(el);
+        if (el) await moveTo(el, current);
+        if (!current()) return;
         if (el && action.type === 'type' && action.value) {
           const key = elements(state).find((e) => e.id === action.target)?.semKey;
           if (key) {
             for (let i = 1; i < action.value.length; i++) {
+              if (!current()) return;
               host.setState(applyAction(state, key, action.value.slice(0, i)).state);
               await sleep(25);
             }
           }
         }
       }
+      if (!current()) return;
       const r = act(state, action);
       state = r.state; result = r.result; semKey = r.semKey;
       host.setState(state);
       await frames();
+      if (!current()) return;
       post({ type: 'retry:cursor', x: lastCursor.x, y: lastCursor.y, pressed: false });
     } catch {
       result = 'error';
+    } finally {
+      if (!disposed && !current()) post({ type: 'retry:act:res', reqId, result: 'error', ...reply(host.getState()) });
     }
-    post({ type: 'retry:act:res', reqId, result, semKey, ...reply(state) });
+    if (current()) post({ type: 'retry:act:res', reqId, result, semKey, ...reply(state) });
   }
 
   function onMessage(ev: MessageEvent): void {
-    if (ev.origin !== window.location.origin) return;
+    if (ev.origin !== window.location.origin || ev.source !== window.parent) return;
     const m = ev.data as Msg | null;
     if (!m || typeof m.type !== 'string' || !m.type.startsWith('retry:')) return;
     switch (m.type) {
@@ -107,14 +119,21 @@ export function installBridge(host: BridgeHost): () => void {
         post({ type: 'retry:snapshot:res', reqId: m.reqId, snapshot: renderSnapshot(s), ids: elements(s).map((e) => e.id), ...reply(s) });
         break;
       }
-      case 'retry:act':
-        queue = queue.then(() => runAct(m.reqId, m.action as AgentAction));
+      case 'retry:act': {
+        const mine = generation;
+        queue = queue.then(() => runAct(m.reqId, m.action as AgentAction, mine)).catch(() => { /* a malformed request must not poison the queue */ });
+        break;
+      }
+      case 'retry:cancel':
+        generation++; queue = Promise.resolve();
+        post({ type: 'retry:cursor', ...lastCursor, pressed: false });
         break;
       case 'retry:highlight':
         highlight = !!m.enabled;
         host.setHighlight(highlight);
         break;
       case 'retry:restore': { // Agent E: roll back to a previous state (rescue happens on the pre-violation page)
+        generation++; queue = Promise.resolve();
         const s = m.state as ShopState;
         if (s && s.layout) host.setState(s);
         post({ type: 'retry:apply:res', reqId: m.reqId, result: 'ok', ...reply(host.getState()) });
@@ -127,8 +146,9 @@ export function installBridge(host: BridgeHost): () => void {
         break;
       }
       case 'retry:reset': {
+        generation++; queue = Promise.resolve();
         const s = host.reset(Number(m.seed), Number(m.versionIndex), (m.bugs as BugId[]) ?? [], typeof m.taskId === 'string' ? m.taskId : undefined);
-        post({ type: 'retry:ready', ...reply(s) });
+        post({ type: 'retry:ready', reqId: m.reqId, ...reply(s) });
         break;
       }
     }
@@ -155,6 +175,7 @@ export function installBridge(host: BridgeHost): () => void {
   document.addEventListener('mousedown', onPointer, true);
   post({ type: 'retry:ready', ...reply(host.getState()) });
   return () => {
+    disposed = true; generation++;
     window.removeEventListener('message', onMessage);
     document.removeEventListener('click', onPointer, true);
     document.removeEventListener('mousedown', onPointer, true);

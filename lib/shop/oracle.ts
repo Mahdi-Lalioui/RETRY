@@ -1,7 +1,8 @@
 // Ground-truth judge (plan.md §8.6).
 import type { AgentAction, Task, Verdict } from '@/lib/agent/types';
-import type { RuleId, ShopState } from './state';
+import type { BugId, RuleId, ShopState } from './state';
 import { bugsAffecting, BUGS } from './bugs';
+import { getUi, totals } from './engine';
 import { TEST_COUPON } from './rules';
 
 export function cartMatches(task: Task, state: ShopState): boolean {
@@ -19,6 +20,16 @@ export function allViolations(task: Task, state: ShopState, orderPlaced: boolean
   return [...v].sort();
 }
 
+/** A hidden injection flag alone is not evidence that the tester found a regression. */
+function observable(bug: BugId, state: ShopState): boolean {
+  switch (bug) {
+    case 'pay_button_dead': return state.page === 'checkout' && getUi(state).payAttempts > 0;
+    case 'total_nan': return (state.page === 'checkout' || state.page === 'confirmation') && totals(state).nan;
+    case 'no_order_id': return state.page === 'confirmation' && !state.orderId;
+    case 'coupon_500': return state.page === 'error' && !!state.couponInput.trim();
+  }
+}
+
 export function judge(task: Task, state: ShopState, finalAction: AgentAction | null, opts?: { stuck?: boolean }): Verdict {
   const orderPlaced = state.page === 'confirmation';
   const violations = allViolations(task, state, orderPlaced);
@@ -31,7 +42,9 @@ export function judge(task: Task, state: ShopState, finalAction: AgentAction | n
 
   if (bugs.length) {
     if (finalAction.type === 'report_bug') {
-      return { status: 'bug_reported', correct: true, reason: `Correctly reported: ${BUGS[bugs[0]].title}`, violations };
+      const found = bugs.find((bug) => observable(bug, state));
+      if (found) return { status: 'bug_reported', correct: true, reason: `Correctly reported: ${BUGS[found].title}`, violations };
+      return { status: 'failed', correct: false, reason: 'Reported a bug without observing a regression', violations };
     }
     return { status: 'failed', correct: false, reason: 'Passed a broken checkout', violations };
   }
