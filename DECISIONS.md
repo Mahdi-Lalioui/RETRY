@@ -44,3 +44,14 @@
 - [H] The scoreboard's RETRY column count-up waits ~900ms after a promotion so it rolls as the training ring closes.
 - [H] /attract: fixed-aspect lanes, a centred big caption band, a live "calls routed through Mubit" counter (one per replayed model step), a held-out scoreboard ticker from /api/metrics, and Esc/Exit back to Mission Control.
 - [H] Rule radar skipped: there is no free space at 1280×720 without shrinking the shops, and the version rail + impact strip tell the same story.
+
+## Agent G
+- [G] Rescue picks that would themselves break a house rule (simulated on the engine) or repeat the stuck no-op are refused; the overlay stays open with `rescue.rejected` set.
+- [G] Textbox/select rescue picks need a value before they become a correction (no empty type/select training pairs).
+- [G] `POST /api/refresh` with zero queued corrections returns `{skipped}` instead of minting a duplicate version; the ring returns to collecting.
+- [G] Mock learning can regress honestly: human "done" corrections that overrule bug reports, once they outnumber report_bug corrections, make the version forget BUG, so the gate holds it back.
+- [G] Cold instance: `/api/agent/step` bootstraps when the client names a version this instance doesn't know (not on every step, so unit tests stay isolated).
+- [G] Client `api()` retries network errors / 502-504 twice (700 ms backoff) so a redeploy mid-run doesn't stamp "failed" verdicts.
+- [G] Real client wraps chat errors as "Mubit timed out after Nms" / "Mubit unreachable: …" (keys redacted); /api/health reports `down` for 60 s after a failure until the next success; the client re-reads health after lane errors and at run end.
+- [G] Vitest testTimeout/hookTimeout 60 s; eval wall-clock bound loosened to 45 s (3-4 s suites flaked at the 5 s default under load).
+- [G] Malformed `state` on /api/agent/step is dropped (was a 500).
