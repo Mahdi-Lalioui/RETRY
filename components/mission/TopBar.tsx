@@ -37,7 +37,7 @@ function MubitPill() {
   const mode = health.mubit;
   const live = health.liveLanes ?? [];
   const cfg =
-    mode === 'mock' && live.length ? { dot: '#34D399', text: `${live.includes('closed') ? 'GPT' : live.join(' + ')} LIVE VIA MUBIT`, sub: 'real calls through api.mubit.ai for this lane · open-model lanes and the learning loop are simulated (MOCK)', cls: 'border-pass/40 bg-pass/10 text-pass' }
+    mode === 'mock' && live.length ? { dot: '#34D399', text: `${live.includes('closed') ? 'GPT' : live.join(' + ')} LIVE VIA MUBIT`, sub: 'real interactive calls through api.mubit.ai for this lane · held-out scores, open-model lanes and the learning loop are simulated (MOCK)', cls: 'border-pass/40 bg-pass/10 text-pass' }
     : mode === 'mock' ? { dot: '#FACC15', text: 'MOCK MODE', sub: 'mock model client · not real Mubit', cls: 'border-yellow-400/40 bg-yellow-400/10 text-yellow-300' }
       : mode === 'down' ? { dot: '#F43F5E', text: 'MUBIT UNREACHABLE', sub: 'check /api/health', cls: 'border-fail/40 bg-fail/10 text-fail' }
         : mode === 'ok' ? { dot: '#34D399', text: 'Mubit configured', sub: 'live requests use Mubit; model and adapter availability depend on the configured integration', cls: 'border-white/10 bg-white/[0.04] text-white/80' }

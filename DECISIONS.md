@@ -71,7 +71,7 @@
 - [G] `POST /api/refresh` with zero queued corrections returns `{skipped}` instead of minting a duplicate version; the ring returns to collecting.
 - [G] Mock learning can regress honestly: human "done" corrections that overrule bug reports, once they outnumber report_bug corrections, make the version forget BUG, so the gate holds it back.
 - [G] Cold instance: `/api/agent/step` bootstraps when the client names a version this instance doesn't know (not on every step, so unit tests stay isolated).
-- [G] Client `api()` retries network errors / 502-504 twice (700 ms backoff) so a redeploy mid-run doesn't stamp "failed" verdicts.
+- [G] Client `api()` retries only GET network errors / 502-504 twice (700 ms backoff); POST corrections/mutations are never automatically duplicated, and Stop during bootstrap prevents deferred work from restarting the run.
 - [G] Real client wraps chat errors as "Mubit timed out after Nms" / "Mubit unreachable: …" (keys redacted); /api/health reports `down` for 60 s after a failure until the next success; the client re-reads health after lane errors and at run end.
 - [G] Vitest testTimeout/hookTimeout 60 s; eval wall-clock bound loosened to 45 s (3-4 s suites flaked at the 5 s default under load).
 - [G] Malformed `state` on /api/agent/step is dropped (was a 500).

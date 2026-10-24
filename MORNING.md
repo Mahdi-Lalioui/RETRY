@@ -4,14 +4,23 @@
 
 The follow-up audit verified the actual OpenAI and Mubit credentials locally and made successful real `gpt-4o-mini` calls through Mubit, including `/api/agent/step`. Keys are saved only in ignored `.env.local` and are not included in this repository. Run `npm run smoke:mubit -- --require-real --inference-only --lane closed` to repeat that check.
 
-For the complete stage flow, use `MUBIT_ENABLED=false npm run dev`: the simulated learning lifecycle is explicitly labelled MOCK MODE. The current account has no Groq/OpenRouter key, and the public Mubit API does not expose adapter inference by model/version ID. Obtain confirmed hackathon endpoints for feedback, refresh, versions and adapter serving before presenting that flow as live. See [VERIFICATION.md](VERIFICATION.md).
+For the complete simulated stage flow, use `MUBIT_ENABLED=false MUBIT_LIVE_LANES= npm run dev`: this clears any configured live-lane override. The authenticated Mubit workspace enables automatic adapter training, approval after tests and transparent rollout; direct adapter pinning by model/version ID is unsupported. At the 11:55 London snapshot the observed QA task had 1 kept example of 25 required, review work pending, no training started and no route. The full live correction-to-serving app loop remains unverified. See [VERIFICATION.md](VERIFICATION.md).
 
 The sections below retain the original handover context; this update supersedes claims that current Mubit API documentation is unavailable or that environment values alone guarantee live training.
 
 The full app is built, tested locally, and pushed to `main`. Tonight it ran on the **mock Mubit client**, because this sandbox had no network access to Mubit or OpenAI. The TopBar shows a yellow **MOCK MODE** pill until real Mubit is configured.
 
-## Recommended stage setup (verified 24 Oct, live)
-`MUBIT_ENABLED=false MUBIT_LIVE_LANES=closed` with `MUBIT_BASE_URL=https://api.mubit.ai/openai/v1` and the Mubit key: the GPT lane makes **real** calls through Mubit (real `mreq_…` ids in the step log, pill "GPT LIVE VIA MUBIT"), while the open-model lanes + learning loop stay simulated and labelled. Bootstrap/held-out eval/attract always stay simulated (fast, free). `npx tsx --env-file=.env.local scripts/mubit-warm.ts 24` sends real calls of RETRY's task so Mubit can train a real adapter on it (check the console's Adapters page). ~160 such calls were already sent on 24 Oct.
+## Recommended stage setup (verified 24 Oct)
+
+Full mock rehearsal:
+
+```bash
+MUBIT_ENABLED=false MUBIT_LIVE_LANES= npm run dev
+```
+
+For hybrid mode, use `MUBIT_ENABLED=false MUBIT_LIVE_LANES=closed npm run dev` with the configured Mubit base URL and key. The GPT lane makes real gateway calls (tracked `mreq_…` IDs and the "GPT LIVE VIA MUBIT" pill); open-model lanes, learning, bootstrap, held-out scores and attract mode remain simulated and labelled. Hybrid scores do not measure the real GPT lane or a trained adapter.
+
+For a bounded, billable real traffic batch, use `npm run train:live -- --examples 60 --output work/training-evidence.json` with real Mubit configuration. It saves actual gateway outputs from scripted checkpoints; these are not human rescues or accepted training examples. The earlier 60-call batch returned 60 valid JSON actions, but acceptance remained 1/25 at the console snapshot. Training depends on review, eligibility and test results; sending calls does not guarantee a trained or serving adapter. Changed system instructions can create a new task, so inspect the task assigned to the new calls. Use this bounded command in place of the original warm-script recommendation.
 
 ## 1. Run it locally (2 min)
 ```bash

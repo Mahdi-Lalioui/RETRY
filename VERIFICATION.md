@@ -9,6 +9,8 @@ The original build plan is a product target. This document records what was actu
 - Versions are evaluated under their canonical identity. Only seeded v1 is the base model. Zero-example adapters, mismatched eval lanes, stale remote versions and manual activation cannot bypass the promotion gate.
 - Real refresh snapshots submitted corrections. Failed, queued or subsequently delivered examples are not falsely marked trained. Unaddressable adapter versions produce clear errors.
 - Stop/restart cancels stale client work and iframe animations. Replay restores live version/training state when it ends and retains scripted correction labels.
+- Automatic client retries apply only to GET requests, preventing duplicate POST corrections and other mutations after ambiguous failures.
+- Stop during bootstrap cancels the pending run; bootstrap completion cannot restart work after Stop.
 - Rescue queues propagate the task's shipping policy, abort on Stop/unmount, support select values and keep failed submissions retryable.
 - Correction acknowledgments mean queued; delivery and training status are reconciled from storage rather than inferred from an animation or promotion.
 - API boundaries validate shop state, task identifiers and required action arguments. Model selection comes from server configuration instead of browser-bundled defaults or arbitrary request models.
@@ -55,7 +57,7 @@ npm run build
 MUBIT_ENABLED=false MOCK_LATENCY_SCALE=0 MOCK_TRAIN_SECONDS=0 npm start
 ```
 
-Current combined verification: **300 tests passed across 20 test files**, typecheck and lint passed without warnings, and the optimized production build succeeded. The earlier 290-test pass preceded the live-traffic CLI.
+Final verification after merging the additional QA fixes: **319 tests passed across 27 test files**, typecheck and lint passed without warnings, and the optimized production build succeeded.
 
 The regression suite covers shop determinism/task completion/oracle behavior, parsing, augmentation, mock learning, real-client HTTP serialization, APIs, held-out evaluation and gates, cancellation, iframe messages, replay isolation and delivery failures. An additional exhaustive ideal-policy sweep completed all 12 tasks on 200 seeds at layouts 1 and 6: 4,800 runs, each within the 16-action budget.
 

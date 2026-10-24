@@ -340,7 +340,9 @@ function resetFrames() {
 let booting: Promise<void> | null = null;
 
 export async function runAll() {
+  const requestedEpoch = runEpoch;
   if (booting) await booting.catch(() => {}); // never run RETRY before its versions are loaded
+  if (requestedEpoch !== runEpoch) return; // Stop or a task change cancels a Run waiting for bootstrap too.
   stopAll();
   const epoch = runEpoch;
   const s = S();
