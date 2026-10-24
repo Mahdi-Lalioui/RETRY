@@ -26,6 +26,8 @@ export function MissionControl() {
   const iclOn = useMission((s) => s.iclOn);
   // The lane deck sits slightly tilted in 3D while idle and straightens as soon as anything runs.
   const active = useMission((s) => s.running || !!s.rescue || Object.values(s.lanes).some((l) => l.steps.length > 0));
+  // On short screens (laptops at 125–150% scaling) a rescue needs a bigger shop, so the bottom row yields height.
+  const rescueOn = useMission((s) => !!s.rescue);
   const lanes: LaneId[] = iclOn ? ['closed', 'base', 'adapted', 'icl'] : ['closed', 'base', 'adapted'];
   useEffect(() => { void boot(); }, []);
   return (
@@ -42,7 +44,8 @@ export function MissionControl() {
               style={{
                 gridTemplateColumns: `repeat(${lanes.length}, minmax(0, 1fr))`,
                 // lane height follows the 16:10 shop at full column width, capped so the bottom row keeps room
-                height: `min(calc((100vw - 48px - ${(lanes.length - 1) * 12}px) / ${lanes.length} * 0.625 + 112px), calc(100dvh - 425px))`,
+                height: `min(calc((100vw - 48px - ${(lanes.length - 1) * 12}px) / ${lanes.length} * 0.625 + 112px), calc(100dvh - ${rescueOn ? 300 : 425}px))`,
+                transition: 'height 0.35s ease',
               }}
             >
               {lanes.map((l) => <Lane key={l} lane={l} />)}
@@ -54,7 +57,7 @@ export function MissionControl() {
           </div>
         </LayoutGroup>
         <StoryStrip />
-        <div className="mt-2.5 grid min-h-[140px] flex-1 gap-3" style={{ gridTemplateColumns: 'minmax(0,1fr) minmax(0,0.95fr) minmax(0,1.75fr)' }}>
+        <div className={`mt-2.5 grid flex-1 gap-3 ${rescueOn ? 'min-h-0 overflow-clip' : 'min-h-[140px]'}`} style={{ gridTemplateColumns: 'minmax(0,1fr) minmax(0,0.95fr) minmax(0,1.75fr)' }}>
           <CorrectionTray />
           <TrainingRing />
           <Scoreboard />

@@ -170,14 +170,26 @@ export function installBridge(host: BridgeHost): () => void {
     if (info) post({ type: 'retry:pick', id, semKey: info.semKey, role: info.role, label: info.label });
   }
 
+  // Keys pressed while focus is inside the shop (e.g. right after a rescue pick) never reach the
+  // parent window; forward them so Mission Control hotkeys and rescue Enter/Esc/1–7 keep working.
+  function onKey(ev: KeyboardEvent): void {
+    const t = ev.target as HTMLElement | null;
+    if (t && /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName)) return;
+    if (ev.metaKey || ev.ctrlKey || ev.altKey) return;
+    if (highlight || ev.key === 'Enter' || ev.key === 'Escape' || ev.key.length === 1) ev.preventDefault();
+    post({ type: 'retry:key', key: ev.key, shiftKey: ev.shiftKey });
+  }
+
   window.addEventListener('message', onMessage);
   document.addEventListener('click', onPointer, true);
   document.addEventListener('mousedown', onPointer, true);
+  document.addEventListener('keydown', onKey, true);
   post({ type: 'retry:ready', ...reply(host.getState()) });
   return () => {
     disposed = true; generation++;
     window.removeEventListener('message', onMessage);
     document.removeEventListener('click', onPointer, true);
     document.removeEventListener('mousedown', onPointer, true);
+    document.removeEventListener('keydown', onKey, true);
   };
 }

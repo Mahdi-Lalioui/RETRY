@@ -38,6 +38,9 @@ function ensureListener() {
     }
     if (d.type === 'retry:cursor') cursorSubs.get(lane)?.forEach((h) => h(d as unknown as CursorMsg));
     if (d.type === 'retry:pick') pickSubs.get(lane)?.forEach((h) => h(d as unknown as Pick));
+    if (d.type === 'retry:key' && typeof d.key === 'string') {
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: d.key, shiftKey: !!d.shiftKey, bubbles: true, cancelable: true }));
+    }
   });
 }
 

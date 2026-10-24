@@ -73,7 +73,7 @@ export function TopBar() {
           {[['/lab', 'Lab'], ['/corrections', 'Corrections'], ['/attract', 'Attract']].map(([h, l]) => (
             <a key={h} href={h} className="whitespace-nowrap rounded-md px-2 py-1 text-[#9AA4B4] transition-colors hover:bg-white/[0.05] hover:text-white">{l}</a>
           ))}
-          <button onClick={() => window.dispatchEvent(new Event('retry:how'))} className="ml-1 flex items-center gap-1 rounded-md border border-mubit/40 px-2 py-[3px] text-[12px] text-[#FF8A5B] hover:bg-mubit/10">
+          <button onClick={() => window.dispatchEvent(new Event('retry:how'))} className="ml-1 flex shrink-0 items-center gap-1 whitespace-nowrap rounded-md border border-mubit/40 px-2 py-[3px] text-[12px] text-[#FF8A5B] hover:bg-mubit/10">
             <span className="hidden 2xl:inline">How Mubit is used</span><span className="2xl:hidden">Mubit</span> <kbd className="rounded border border-mubit/40 px-1 font-mono text-[10.5px]">?</kbd>
           </button>
         </nav>

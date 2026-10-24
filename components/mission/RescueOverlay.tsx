@@ -71,7 +71,7 @@ export function RescueOverlay({ lane }: { lane: LaneId }) {
               <span className="ml-auto shrink-0 rounded-md border border-fail bg-[#3a0d18] px-1.5 py-px font-mono text-[12px] font-semibold text-[#FF8FA3]">broke {rescue.autoRule}</span>
             )}
           </motion.div>
-          <div className="absolute inset-x-0 bottom-2 flex justify-center">
+          <div className="absolute inset-x-0 bottom-2 flex justify-center [@media(max-height:820px)]:hidden">
             <span className="flex items-center gap-2 rounded-full border border-rescue/60 bg-[#1d1405] px-3 py-1 text-[12px] text-[#FDE7C2] 2xl:text-[13.5px]">
               <Kbd>click</Kbd> pick <span className="text-rescue/50">·</span> <Kbd>1–7</Kbd> tag rule <span className="text-rescue/50">·</span> <Kbd>↵</Kbd> teach <span className="text-rescue/50">·</span> <Kbd>Esc</Kbd> skip
             </span>
