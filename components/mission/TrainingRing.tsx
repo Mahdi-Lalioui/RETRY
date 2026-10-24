@@ -70,7 +70,9 @@ export function TrainingRing() {
       <div className="flex min-w-0 flex-1 flex-col justify-center gap-1.5 pt-3">
         <div className="whitespace-nowrap text-[13px] font-medium text-white 2xl:text-[15px]">{status}</div>
         {(phase === 'training' || phase === 'evaluating') && (
-          <div className="font-mono text-[11px] text-muted">elapsed <span className="tnum text-white/80">{fmtDur(elapsed)}</span> <span className="text-faint">· est. ~2m</span></div>
+          <div className="font-mono text-[11px] text-muted">elapsed <span className="tnum text-white/80">{fmtDur(elapsed)}</span>
+            {/* estimate from the server's own progress, so it matches the configured training time */}
+            {phase === 'training' && training.progress > 0.08 && <span className="text-faint"> · est. {fmtDur(elapsed / training.progress)}</span>}</div>
         )}
         {phase === 'held_back' && <div className="text-[11px] text-fail/80">{training.reason ?? 'regression on bug detection'} — previous version kept</div>}
         <div className="font-mono text-[11px] leading-tight text-muted">

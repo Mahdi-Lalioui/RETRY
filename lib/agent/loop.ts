@@ -21,6 +21,7 @@ const controllers = new Map<LaneId, AbortController>();
 const rescueWaiters = new Map<LaneId, (r: RescueResult | null) => void>();
 const usedSeeds = new Set<number>();
 let rescueChain: Promise<void> = Promise.resolve();
+let baseRescuedOnce = false;
 let runEpoch = 0;
 
 export interface RescueResult { pick: Pick; value?: string; rule?: RuleId | 'other'; ruleText?: string }
@@ -89,6 +90,9 @@ async function runLane(lane: LaneId, sig: AbortSignal) {
   const history: HistoryItem[] = [];
   st.patchLane(lane, { status: 'running', runId, steps: [], verdict: undefined, bug: undefined, latencies: [], costUsd: 0, costKnown: false, promptChars: 0, flash: null, error: undefined, thinking: false });
   let state: ShopState | null = null;
+  // One live rescue per lane per run: a rescue cannot change the model mid-run, so a second failure ends the run
+  // and points at the Mubit update instead of stalling the stage on rescue after rescue.
+  let rescued = false;
   try {
     for (let stepIdx = 0; stepIdx <= MAX_STEPS; stepIdx++) {
       check(sig);
@@ -147,8 +151,12 @@ async function runLane(lane: LaneId, sig: AbortSignal) {
 
       if (detectStuck(history, before, after, MAX_STEPS)) {
         // Only open-model lanes are rescued live: their rescues train the adapter. GPT/ICL end with the verdict.
-        if (S().mode !== 'live' || lane === 'closed' || lane === 'icl') {
-          const v = await finish(runId, lane, task.id, null, state, { status: newRule ? 'violation' : 'stuck', correct: false, reason: newRule ? `Broke house rule ${newRule}` : 'Agent got stuck', violations: state.violations });
+        // Base v1 never learns, so after its first rescue on stage it only stamps verdicts; RETRY's rescues still open.
+        if (S().mode !== 'live' || lane === 'closed' || lane === 'icl' || rescued || (lane === 'base' && baseRescuedOnce)) {
+          const reason = rescued
+            ? (newRule ? `Broke ${newRule} again · needs a Mubit update` : 'Stuck again · needs a Mubit update')
+            : (newRule ? `Broke house rule ${newRule}` : 'Agent got stuck');
+          const v = await finish(runId, lane, task.id, null, state, { status: newRule ? 'violation' : 'stuck', correct: false, reason, violations: state.violations });
           check(sig);
           stamp(lane, v);
           return;
@@ -200,6 +208,8 @@ async function runLane(lane: LaneId, sig: AbortSignal) {
           stamp(lane, v);
           return;
         }
+        rescued = true;
+        if (lane === 'base') baseRescuedOnce = true;
         S().patchLane(lane, { status: 'running', flash: null });
         const good: AgentAction = {
           type: rescue.pick.role === 'textbox' ? 'type' : rescue.pick.role === 'select' ? 'select' : 'click',

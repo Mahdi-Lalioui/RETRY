@@ -71,7 +71,8 @@ export interface MissionState {
 export const useMission = create<MissionState>((set, get) => ({
   mode: 'live',
   health: { mubit: 'unknown', db: 'unknown', demoMode: false },
-  seed: DEFAULT_SEED, versionIndex: 4, layoutTag: 'layout-v4', layoutFlash: 0,
+  // Starts one release before R7 (REVEAL_R7_AT=6), so a single "Ship new version" reveals the new gift-wrap rule on stage.
+  seed: DEFAULT_SEED, versionIndex: 5, layoutTag: 'layout-v5', layoutFlash: 0,
   taskId: 'T2', bugs: [], iclOn: false, sound: false, running: false, frameEpoch: 0,
   lanes: { closed: freshLane(), base: freshLane(), adapted: freshLane(), icl: freshLane() },
   calls: 0,

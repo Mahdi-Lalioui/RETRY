@@ -54,11 +54,15 @@ function derive(s: MissionState, lastStamp: LaneId | null): Caption {
   if (lastStamp && s.lanes[lastStamp]?.verdict) {
     const v = s.lanes[lastStamp].verdict!;
     const n = laneName(lastStamp, A);
+    if (v.reason.includes('needs a Mubit update')) {
+      const r = v.violations[v.violations.length - 1] as RuleId | undefined;
+      return { step: 'Verdict', tone: 'mubit', key: `v-${lastStamp}-again${s.lanes[lastStamp].verdictKey}`, text: <>{n} {r ? <>broke <b className="text-fail">{r}</b> again</> : 'got stuck again'} — a rescue can’t change a model mid-run. Press <Kbd>T</Kbd>: <b className="text-mubit">Mubit</b> turns the rescue into <b className="text-learn">{nextLabel(A)}</b>.</> };
+    }
     if (v.status === 'violation') {
       const r = v.violations[0] as RuleId | undefined;
       return { step: 'Verdict', tone: 'fail', key: `v-${lastStamp}-${s.lanes[lastStamp].verdictKey}`, text: <>{n} broke house rule <b className="text-fail">{r}</b>{ruleTitle(r) ? <> — {ruleTitle(r)!.toLowerCase()}</> : null}. No model knows your team’s rules.</> };
     }
-    if (v.status === 'bug_reported') return { step: 'Verdict', tone: 'fail', key: `v-${lastStamp}-b`, text: <>{n} reported a real regression: <b className="text-fail">“{v.reason}”</b> — a ready-made bug ticket, not a false pass.</> };
+    if (v.status === 'bug_reported') return { step: 'Verdict', tone: 'fail', key: `v-${lastStamp}-b`, text: <>{n} reported a real regression: <b className="text-fail">“{s.lanes[lastStamp].bug?.evidence ?? v.reason}”</b> — a ready-made bug ticket, not a false pass.</> };
     if (v.status === 'passed') return { step: 'Verdict', tone: 'pass', key: `v-${lastStamp}-p${s.lanes[lastStamp].verdictKey}`, text: <>{n} completed the ticket <b className="text-pass">following every house rule</b>{lastStamp === 'adapted' ? ' — learned from past rescues, not prompted.' : '.'}</> };
     if (v.status === 'stuck') return { step: 'Verdict', tone: 'rescue', key: `v-${lastStamp}-s${s.lanes[lastStamp].verdictKey}`, text: <>{n} got stuck — {v.reason.toLowerCase()}. This is where a human would normally rescue it, every single time.</> };
     if (v.status === 'failed') return { step: 'Verdict', tone: 'fail', key: `v-${lastStamp}-f`, text: <>{n} failed — {v.reason}.</> };

@@ -20,6 +20,7 @@ export function HowMubit() {
   const counts = useMission((s) => s.counts);
   const label = useMission((s) => s.adapted.label);
   const mock = useMission((s) => s.health.mubit === 'mock');
+  const hybrid = useMission((s) => s.health.mubit === 'mock' && (s.health.liveLanes ?? []).includes('closed'));
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const t = e.target as HTMLElement | null;
@@ -48,7 +49,8 @@ export function HowMubit() {
               </div>
               <button onClick={() => setOpen(false)} className="ml-auto flex items-center gap-2 rounded-lg border border-white/15 px-3 py-1.5 text-[13px] text-white/80 hover:bg-white/5"><X className="h-4 w-4" /> close <Kbd>Esc</Kbd></button>
             </div>
-            <p className="mt-4 text-[14px] text-rescue">{mock ? 'MOCK REHEARSAL · Model calls, training and benchmark results are simulated.' : 'Live inference uses Mubit. Adapter training and serving require a confirmed integration.'}</p>
+            <p className="mt-4 text-[14px] text-rescue">{hybrid ? 'GPT LANE LIVE · its calls go through api.mubit.ai for real (request ids in the step log). Open-model lanes, training and benchmark results are simulated.'
+              : mock ? 'MOCK REHEARSAL · Model calls, training and benchmark results are simulated.' : 'Live inference uses Mubit. Adapter training and serving require a confirmed integration.'}</p>
             <div className="relative mt-8 grid grid-cols-4 gap-5">
               {/* connecting beam */}
               <div className="how-beam pointer-events-none absolute left-[6%] right-[6%] top-[58px] h-[2px]" />
