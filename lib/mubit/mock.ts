@@ -45,10 +45,14 @@ const PRODUCTS = [
 ];
 const QTY: Record<string, number> = { a: 1, an: 1, one: 1, two: 2, three: 3, four: 4, five: 5 };
 
-export interface GoalSpec { items: { name: string; qty: number }[]; coupon: boolean }
+export interface GoalSpec { items: { name: string; qty: number }[]; coupon: boolean; uk?: boolean }
 export function parseGoal(goal: string): GoalSpec {
   const g = goal.toLowerCase();
   const coupon = /test coupon/.test(g);
+  const r = parseGoalItems(g, coupon);
+  return { ...r, uk: /uk test order|in-store collection/.test(g) };
+}
+function parseGoalItems(g: string, coupon: boolean): GoalSpec {
   if (/cheapest/.test(g)) return { items: [{ name: [...PRODUCTS].sort((a, b) => a.price - b.price)[0].name, qty: 1 }], coupon };
   if (/most expensive/.test(g)) return { items: [{ name: [...PRODUCTS].sort((a, b) => b.price - a.price)[0].name, qty: 1 }], coupon };
   const under = g.match(/every product under £(\d+)/);
@@ -69,9 +73,13 @@ export function hash(s: string): number {
   for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 0x01000193); }
   return h >>> 0;
 }
-const coin = (key: string, p: number) => (hash(key) % 1000) / 1000 < p;
+function mix(h: number): number { // avalanche: FNV-1a alone correlates keys that differ only in a suffix
+  h ^= h >>> 16; h = Math.imul(h, 0x85ebca6b); h ^= h >>> 13; h = Math.imul(h, 0xc2b2ae35); h ^= h >>> 16;
+  return h >>> 0;
+}
+const coin = (key: string, p: number) => (mix(hash(key)) % 1000) / 1000 < p;
 
-const DECLINE = /no thanks|skip|not now|without|essential|necessary|reject|decline|maybe later|no,? thank|dismiss|close|^×$|^x$/i;
+const DECLINE = /^no\b|no thanks|skip|not now|without|essential|necessary|reject|decline|maybe later|no,? thank|dismiss|close|^×$|^x$/i;
 const ADD = /\badd\b|get it/i;
 const CART = /cart|bag|basket/i;
 const CHECKOUT = /checkout|payment|proceed|secure/i;
@@ -183,9 +191,10 @@ function checkoutPage(c: Ctx): AgentAction | null {
   if (radios.length) {
     const collect = radios.find((e) => /collect|store/i.test(e.label));
     const standard = radios.find((e) => /standard/i.test(e.label)) ?? radios[0];
-    const want = c.knows('R3') ? collect ?? standard : standard;
-    if (!radios.some((r) => r.checked) || (c.knows('R3') && want && !want.checked)) {
-      if (!want.checked) return click(want, c.knows('R3') ? 'House policy: collect in store for UK test orders.' : 'Choose standard shipping.');
+    const useCollect = c.knows('R3') && !!c.goal.uk;
+    const want = useCollect ? collect ?? standard : standard;
+    if (!radios.some((r) => r.checked) || (useCollect && want && !want.checked)) {
+      if (!want.checked) return click(want, useCollect ? 'House policy: collect in store for UK test orders.' : 'Choose standard shipping.');
     }
   }
   // coupon (R2)
@@ -290,7 +299,12 @@ export function createMockClient(): MubitClient {
       const key = `${req.model}|${hash(p.snapshot)}`;
       let knows: Knows; let reportsBug: boolean;
       if (closed) {
-        knows = (t) => (t === 'R5' || t === 'R1' || t === 'R6') && coin(`${key}|${t}`, 0.5);
+        // A smart general model: common QA sense (decline upsells, essential cookies, ignore newsletter traps ~93%;
+        // Stripe-style 4242 test card instead of a saved card ~93%) but no org knowledge (NIGHTSHIFT, UK collect, R7).
+        // The payment choice is keyed on the layout's checkout labels (stable across the run's checkout steps), so one
+        // run makes one R4 decision rather than re-rolling on every checkout snapshot.
+        const payKey = `${req.model}|${p.goal}|${snap.els.filter((e) => /saved|card|pay/i.test(e.label)).map((e) => e.label).join('|')}`;
+        knows = (t) => ((t === 'R5' || t === 'R1' || t === 'R6') && coin(`${key}|${t}`, 0.93)) || (t === 'R4' && coin(`${payKey}|R4`, 0.93));
         reportsBug = true;
       } else if (p.icl) {
         // ICL: knows rules that appear in the example block; imperfect retrieval (~85%).

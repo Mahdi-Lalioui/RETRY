@@ -42,7 +42,12 @@ export async function decide(req: StepRequest, opts: DecideOpts = {}): Promise<S
 /** Fill in the adapted lane's promoted version and map our version id → Mubit version id. */
 export async function resolveModelRef(lane: StepRequest['lane'], ref: ModelRef): Promise<{ ref: ModelRef; versionId: string | null }> {
   if (ref.kind !== 'open' || (lane !== 'adapted' && !ref.versionId)) return { ref, versionId: null };
-  const v = ref.versionId ? await findVersion(ref.versionId) : await repo.versions.current();
+  // A client-held versionId may be unknown here (in-memory DB per Vercel instance, or a label from the badge): fall back
+  // to the label, then to this instance's promoted version — never silently to the naive base model.
+  const label = ref.label?.match(/\bv\d+\b/)?.[0];
+  const v = (ref.versionId ? await findVersion(ref.versionId) : null)
+    ?? (lane === 'adapted' && label ? await findVersion(label) : null)
+    ?? (lane === 'adapted' ? await repo.versions.current() : null);
   if (!v || (v.examples ?? 0) === 0) return { ref: { ...ref, versionId: undefined }, versionId: v?.id ?? null };
   return { ref: { ...ref, versionId: v.mubitVersionId ?? v.id }, versionId: v.id };
 }

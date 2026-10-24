@@ -2,7 +2,10 @@
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import type { BugId, ShopState } from '@/lib/shop/state';
-import { applyAction, elements, initialState } from '@/lib/shop/engine';
+import { applyAction, elements, getUi, initialState } from '@/lib/shop/engine';
+import { TASKS } from '@/lib/shop/tasks';
+
+const collectFor = (taskId?: string) => !!TASKS.find((t) => t.id === taskId)?.wantsCollect;
 import { installBridge, post } from '@/lib/shop/bridge';
 import { ShopContext, type ShopCtx } from './ShopContext';
 import { CartFloating, Header } from './Header';
@@ -19,8 +22,8 @@ const reducer = (_: ShopState, a: Act): ShopState => a.state;
 
 interface Hover { x: number; y: number; w: number; h: number; chip: string }
 
-export function ShopShell({ seed, versionIndex, bugs }: { seed: number; versionIndex: number; bugs: BugId[] }) {
-  const [state, set] = useReducer(reducer, undefined, () => initialState(seed, versionIndex, bugs));
+export function ShopShell({ seed, versionIndex, bugs, taskId }: { seed: number; versionIndex: number; bugs: BugId[]; taskId?: string }) {
+  const [state, set] = useReducer(reducer, undefined, () => initialState(seed, versionIndex, bugs, { collectRequired: collectFor(taskId) }));
   const stateRef = useRef(state);
   const [highlight, setHighlight] = useState(false);
   const [hover, setHover] = useState<Hover | null>(null);
@@ -37,7 +40,10 @@ export function ShopShell({ seed, versionIndex, bugs }: { seed: number; versionI
       getState: () => stateRef.current,
       setState: commit,
       setHighlight: (on) => { setHighlight(on); if (!on) setHover(null); },
-      reset: (sd, v, b) => { const s = initialState(sd, v, b); commit(s); scrollRef.current?.scrollTo({ top: 0 }); return s; },
+      reset: (sd, v, b, tid) => {
+        // No taskId → same task as before: keep the current order's collect-in-store requirement.
+        const req = tid !== undefined ? collectFor(tid) : !!getUi(stateRef.current).collectRequired;
+        const s = initialState(sd, v, b, { collectRequired: req }); commit(s); scrollRef.current?.scrollTo({ top: 0 }); return s; },
       scrollRoot: () => scrollRef.current,
     });
   }, [commit]);

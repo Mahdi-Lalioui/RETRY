@@ -30,7 +30,7 @@ describe('mock snapshot/goal parsing', () => {
     expect(s.els[1]).toMatchObject({ id: 'e2', role: 'button', label: 'Protect it — £6', region: 'modal:upsell' });
   });
   it('parses goals', () => {
-    expect(parseGoal('Buy two Ember Mugs using the test coupon.')).toEqual({ items: [{ name: 'Ember Mug', qty: 2 }], coupon: true });
+    expect(parseGoal('Buy two Ember Mugs using the test coupon.')).toEqual({ items: [{ name: 'Ember Mug', qty: 2 }], coupon: true, uk: false });
     expect(parseGoal('Buy the cheapest product in the store.').items[0].name).toBe('Ember Mug');
     expect(parseGoal('Buy one of every product under £20.').items.map((i) => i.name)).toEqual(['Ember Mug', 'Moss Planter']);
     expect(parseGoal('Buy a Drift Hoodie and an Aurora Lamp.').items.map((i) => i.name)).toEqual(['Drift Hoodie', 'Aurora Lamp']);

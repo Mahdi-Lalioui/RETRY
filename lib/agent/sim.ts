@@ -26,7 +26,7 @@ export async function simulateRun(o: SimOpts): Promise<SimResult> {
   const runId = o.runId ?? `sim_${nanoid(10)}`;
   const { ref, versionId } = await resolveModelRef(o.lane, o.modelRef ?? LANES[o.lane].modelRef());
   const iclExamples = o.lane === 'icl' ? await loadIclExamples() : undefined;
-  let state = initialState(o.seed, o.versionIndex, o.bugs);
+  let state = initialState(o.seed, o.versionIndex, o.bugs, { collectRequired: o.task.wantsCollect });
   const history: HistoryItem[] = [];
   const steps: SimStep[] = [];
   let verdict: Verdict | null = null;

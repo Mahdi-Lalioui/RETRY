@@ -29,6 +29,8 @@ export interface CorrectionView {
   id: string; lane: LaneId; rule?: RuleId | 'other'; ruleText?: string;
   bad: { action: AgentAction; label?: string }; good: { action: AgentAction; label?: string };
   augmented: number; status: 'queued' | 'sent' | 'trained' | 'failed'; landed: boolean; at: number;
+  /** Agent E: 'scripted' = overnight solver backlog (never shown as human); undefined/'human' = a person. */
+  source?: 'human' | 'scripted';
 }
 export interface ScoreRow {
   key: string; label: string; unit?: string; better: 'higher' | 'lower';
@@ -54,6 +56,8 @@ export interface MissionState {
   adapted: AdaptedVersion; flipKey: number; prevAdaptedLabel?: string;
   scope: Scope; rows: ScoreRow[]; curve: CurvePoint[]; metricsKey: number;
   breakMenu: boolean; replayAt?: string;
+  /** Agent E: recording's honestLabel (ReplayBanner must show it verbatim), title, current scene caption; Shift+R recorder on. */
+  replayLabel?: string; replayTitle?: string; replayCaption?: string; recording?: boolean;
 
   set: (p: Partial<MissionState>) => void;
   patchLane: (lane: LaneId, p: Partial<LaneRuntime> | ((l: LaneRuntime) => Partial<LaneRuntime>)) => void;

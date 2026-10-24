@@ -41,7 +41,7 @@ export async function collectBacklog(o: BacklogOpts = {}): Promise<ScriptedRescu
   for (let seed = TRAINING_SEEDS.min; seed <= maxSeed && !full(); seed++) {
     const task = TASKS[(seed * 5) % TASKS.length];
     const bugs = bugsForSeed(seed, task);
-    let state = initialState(seed, 1, bugs);
+    let state = initialState(seed, 1, bugs, { collectRequired: task.wantsCollect });
     const history: HistoryWithState[] = [];
     for (let idx = 0; idx < 24; idx++) {
       const snapshot = renderSnapshot(state);

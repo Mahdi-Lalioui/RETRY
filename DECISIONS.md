@@ -23,3 +23,14 @@
 - [F] Scoreboard hides "Prompt size" unless the ICL lane is on (identical across lanes otherwise) so it fits at 1280×720.
 - [F] Raised --faint/--muted and the panel-label/caption sizes for projector contrast; body text ≥12px in the new UI.
 - [F] Replaced the default favicon.ico with an original app/icon.svg (circular-arrow glyph) and added app/opengraph-image.tsx.
+- [E] R3 is task-scoped: UK test orders = T1, T3, T5, T7, T11 (5/12; T9 dropped from the suggested set so a general model has 4 org-rule-free tasks); engine records R3 only with `ui.collectRequired`.
+- [E] Closed mock = general QA sense: R1/R5/R6 and R4 (4242 card) each ~93%, never R2/R3/R7; R4 coin keyed per run's checkout labels, coins avalanche-mixed (FNV suffix correlation made "50%" coins far off).
+- [E] Non-UK orders: solver/mock choose standard delivery; bridge `retry:reset` takes optional taskId (omitted = keep current collect requirement).
+- [E] D replay lives in lib/agent/demo-driver.ts (registered via setReplayProvider in boot); recording's honestLabel goes to store `replayLabel` (banner must render it).
+- [E] Shift+R live recorder installed from boot() as a capture-phase window listener (Hotkeys.tsx untouched); download on second press.
+- [E] Adapted lane: an unknown client versionId resolves by badge label, then to the instance's promoted version (was silently naive → "Yes, add cover" after promotion on another instance).
+- [E] REVEAL_R7_AT stays 6: Mission Control starts at layout-v4, so "Ship new version" reaches R7 on the 2nd press.
+- [E] Live rescue after a violation restores the pre-action shop state (new bridge msg `retry:restore`) so the human picks the right element on the page where the model went wrong.
+- [E] Mock DECLINE regex matches "No gift wrap" (was unmatched → learned-R7 versions still clicked the first button, often "Add gift wrap").
+- [E] Mission tray on boot shows bootstrap corrections too, marked `source:'scripted'` on CorrectionView.
+- [E] Refresh status reports 'evaluating' on the poll where training finishes, so the ring shows training → evaluating → promoted on mock too.

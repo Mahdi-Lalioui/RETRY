@@ -13,6 +13,7 @@ import { emit } from '@/lib/store/bus';
 import { MAX_STEPS, REFRESH_MIN_EXAMPLES } from '@/lib/store/lanes';
 import { useMission, type CorrectionView, type CurvePoint, type ScoreRow, type Scope } from '@/lib/store/mission';
 import { play } from '@/lib/store/sfx';
+import { installRecorderHotkey, recordEvent, startReplay, stopReplay } from './demo-driver';
 
 const S = () => useMission.getState();
 const controllers = new Map<LaneId, AbortController>();
@@ -54,11 +55,15 @@ function modelRefFor(lane: LaneId) {
 async function finish(runId: string, lane: LaneId, taskId: string, finalAction: AgentAction | null, state: ShopState | null, fallback: Verdict): Promise<Verdict> {
   try {
     if (!state) return fallback;
-    return await api<Verdict>('/api/agent/finish', { runId, lane, taskId, finalAction, finalState: state, stuck: finalAction === null });
+    const v = await api<Verdict>('/api/agent/finish', { runId, lane, taskId, finalAction, finalState: state, stuck: finalAction === null });
+    // A run that ended on a house-rule violation shows a violation verdict, not "stuck" (the judge's stuck flag wins server-side).
+    if (!finalAction && fallback.status === 'violation' && v.status === 'stuck') return { ...v, status: 'violation', reason: fallback.reason, violations: [...new Set([...v.violations, ...fallback.violations])].sort() as RuleId[] };
+    return v;
   } catch { return fallback; }
 }
 
 function stamp(lane: LaneId, v: Verdict) {
+  recordEvent({ kind: 'verdict', sceneId: S().taskId, lane, runId: S().lanes[lane].runId ?? '', verdict: v, steps: S().lanes[lane].steps.length });
   S().patchLane(lane, (l) => ({ verdict: v, verdictKey: l.verdictKey + 1, status: 'done', thinking: false }));
   emit('stamp', { lane });
   play('thunk');
@@ -86,6 +91,7 @@ async function runLane(lane: LaneId, sig: AbortSignal) {
       }, sig);
       check(sig);
       emit('call', { lane, ms: res.latencyMs });
+      recordEvent({ kind: 'step', sceneId: S().taskId, lane, runId, stepIdx, action: res.action, result: 'ok', latencyMs: res.latencyMs, costUsd: res.costUsd, promptChars: res.promptChars, snapshot: snap.snapshot });
       S().set({ calls: S().calls + 1 });
       const entry = { idx: stepIdx, action: res.action, label: res.action.target ? labels[res.action.target] : undefined, latencyMs: res.latencyMs, stepId: res.stepId };
       S().patchLane(lane, (l) => ({
@@ -113,6 +119,7 @@ async function runLane(lane: LaneId, sig: AbortSignal) {
       }
 
       const before = state?.violations.length ?? 0;
+      const preAct = state;
       const actRes = await bridge.act(lane, res.action);
       check(sig);
       state = actRes.state;
@@ -135,6 +142,11 @@ async function runLane(lane: LaneId, sig: AbortSignal) {
         S().patchLane(lane, { rescueQueued: true });
         try { await Promise.race([prevRescue, new Promise((r) => sig.addEventListener('abort', r, { once: true }))]); } finally { S().patchLane(lane, { rescueQueued: false }); }
         if (sig.aborted) { release(); throw new Aborted(); }
+        // The human teaches the decision the model got wrong, so put the shop back on the page *before* the bad action
+        // (e.g. the upsell modal is open again and "Not now" can be picked). The violation stays in the step log.
+        if (newRule && preAct) {
+          try { state = (await bridge.restore(lane, preAct)).state; } catch { /* keep current page */ }
+        }
         S().patchLane(lane, { status: 'rescue' });
         S().set({ rescue: { lane, stepId: res.stepId, badAction: res.action, badLabel: entry.label, autoRule: newRule, rule: newRule, otherText: '', value: '' } });
         bridge.highlight(lane, true);
@@ -148,7 +160,8 @@ async function runLane(lane: LaneId, sig: AbortSignal) {
         if (S().rescue?.lane === lane) S().set({ rescue: null });
         check(sig);
         if (!rescue) {
-          stamp(lane, await finish(runId, lane, task.id, null, state, { status: newRule ? 'violation' : 'stuck', correct: false, reason: newRule ? `Broke house rule ${newRule} · rescue skipped` : 'Stuck · rescue skipped', violations: state.violations }));
+          const vs = newRule && !state.violations.includes(newRule) ? [...state.violations, newRule] : state.violations; // pre-violation state was restored
+          stamp(lane, await finish(runId, lane, task.id, null, state, { status: newRule ? 'violation' : 'stuck', correct: false, reason: newRule ? `Broke house rule ${newRule} · rescue skipped` : 'Stuck · rescue skipped', violations: vs }));
           return;
         }
         S().patchLane(lane, { status: 'running', flash: null });
@@ -179,6 +192,7 @@ async function submitCorrection(lane: LaneId, stepId: string, bad: AgentAction, 
   };
   S().set({ corrections: [view, ...S().corrections].slice(0, 12) });
   emit('card', { id, lane });
+  recordEvent({ kind: 'correction', sceneId: S().taskId, lane, rule: (r.rule === 'other' ? null : r.rule ?? (good.type === 'report_bug' ? 'BUG' : null)) as RuleId | 'BUG' | null, source: 'human', badAction: bad, goodAction: good, augmented: 8 });
   const isBug = good.type === 'report_bug';
   const rule = r.rule === 'other' ? 'Other' : r.rule ?? (isBug ? 'BUG' : undefined);
   const note = r.rule === 'other' && r.ruleText ? r.ruleText : undefined;
@@ -217,7 +231,7 @@ export function stopAll() {
 
 function resetFrames() {
   const s = S();
-  s.activeLanes().forEach((l) => bridge.reset(l, s.seed, s.versionIndex, s.bugs));
+  s.activeLanes().forEach((l) => bridge.reset(l, s.seed, s.versionIndex, s.bugs, s.taskId));
 }
 
 export async function runAll() {
@@ -227,6 +241,9 @@ export async function runAll() {
   resetFrames();
   s.set({ running: true });
   const lanes = s.activeLanes();
+  const task = getTask(s.taskId);
+  recordEvent({ kind: 'scene', sceneId: s.taskId, title: task.id, caption: task.goal, taskId: task.id, goal: task.goal, seed: s.seed, versionIndex: s.versionIndex, bugs: s.bugs, layoutTag: s.layoutTag,
+    lanes: lanes.map((l) => ({ lane: l, label: LANES[l].label, versionLabel: l === 'adapted' ? s.adapted.label : l === 'base' ? 'v1' : '' })) });
   await new Promise((r) => setTimeout(r, 200));
   await Promise.all(lanes.map(async (lane) => {
     const c = new AbortController();
@@ -297,6 +314,7 @@ export function toggleDemo() {
   const s = S();
   const next = s.mode === 'live' ? 'replay' : 'live';
   if (next === 'replay') stopAll();
+  else { stopReplay(); s.resetLanes(); resetFrames(); }
   s.set({ mode: next, replayAt: s.replayAt ?? new Date().toLocaleString('en-GB', { weekday: 'short', hour: '2-digit', minute: '2-digit' }) });
   if (next === 'replay') void replayProvider?.();
 }
@@ -320,6 +338,7 @@ export async function trainNow() {
       await new Promise((r) => setTimeout(r, 1000));
       const st = await apiSafe<StatusRes>(`/api/refresh/status${jobId ? `?jobId=${encodeURIComponent(jobId)}` : ''}`);
       if (!st) continue;
+      if (st.phase !== 'collecting') recordEvent({ kind: 'version', phase: st.phase, label: st.version?.label ?? '…', progress: st.progress ?? (st.phase === 'promoted' || st.phase === 'held_back' ? 1 : 0.5), examples: st.version?.examples ?? undefined, headline: st.reason });
       if (st.phase === 'training' || st.phase === 'collecting') S().set({ training: { ...S().training, phase: 'training', progress: st.progress ?? Math.min(0.95, (Date.now() - startedAt) / 120000) } });
       else if (st.phase === 'evaluating') S().set({ training: { ...S().training, phase: 'evaluating', progress: st.progress ?? 0.5 } });
       else if (st.phase === 'held_back') {
@@ -389,6 +408,9 @@ export async function loadMetrics(scope: Scope = S().scope) {
 }
 
 export async function boot() {
+  // Agent E: D replays public/demo/session-default.json through the real lanes; Shift+R records a live session.
+  if (!replayProvider) setReplayProvider(() => startReplay());
+  installRecorderHotkey();
   // Agent D: seeds demo data when the DB is empty. Missing route -> ignored.
   await apiSafe('/api/demo/bootstrap', {});
   const [health, versions, corrections] = await Promise.all([
@@ -399,6 +421,7 @@ export async function boot() {
   const s = S();
   if (health) s.set({ health, mode: health.demoMode ? 'replay' : s.mode });
   else s.set({ health: { mubit: 'down', db: 'unknown', demoMode: false } });
+  if (health?.demoMode) void startReplay();
   if (Array.isArray(versions)) {
     const v = latestPromoted(versions);
     if (v) s.set({ adapted: v });
@@ -409,7 +432,8 @@ export async function boot() {
     s.set({ counts: { rescues, examples: corrections.length, sinceVersion: since } });
     // Show the most recent human rescues in the tray (if the API returns their actions).
     const recent: CorrectionView[] = corrections
-      .filter((c) => c.source === 'human' && c.goodAction && typeof c.goodAction === 'object')
+      .filter((c) => (c.source === 'human' || c.source === 'scripted') && c.goodAction && typeof c.goodAction === 'object')
+      .sort((a, b) => Number(b.source === 'human') - Number(a.source === 'human'))
       .slice(0, 5)
       .map((c, i) => ({
         id: c.id ?? `srv_${i}`, lane: (c.lane as LaneId) ?? 'base',
@@ -417,6 +441,7 @@ export async function boot() {
         ruleText: c.rule && !/^R[1-7]$/.test(c.rule) ? c.rule.replace(/^other:/, '') : undefined,
         bad: { action: (c.badAction as AgentAction) ?? { type: 'click', reason: '' }, label: c.badLabel },
         good: { action: c.goodAction as AgentAction, label: c.goodLabel },
+        source: c.source === 'scripted' ? 'scripted' as const : 'human' as const,
         augmented: 8, status: c.status === 'trained' || c.versionId ? 'trained' : c.status === 'failed' ? 'failed' : 'sent', landed: true, at: Date.now() - i,
       }));
     if (recent.length && S().corrections.length === 0) s.set({ corrections: recent });

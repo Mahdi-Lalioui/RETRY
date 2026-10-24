@@ -62,7 +62,8 @@ export function solveStep(task: Task, state: ShopState): AgentAction {
       if (!cartOk) return click(state, 'header.cart', 'Fix the cart contents');
       if (totals(state).nan) return { type: 'report_bug', reason: 'Order summary total shows "£NaN"' };
       if (getUi(state).payAttempts > 0) return { type: 'report_bug', reason: 'Pay button does nothing: still on checkout after pressing pay' };
-      if (state.shipping !== 'collect') return click(state, 'checkout.ship.collect', 'House policy: UK test orders collect in store');
+      if (task.wantsCollect && state.shipping !== 'collect') return click(state, 'checkout.ship.collect', 'House policy: UK test orders collect in store');
+      if (!state.shipping) return click(state, 'checkout.ship.standard', 'Choose standard delivery');
       if (task.wantsCoupon && state.couponApplied !== TEST_COUPON) {
         if (state.couponInput.trim().toUpperCase() !== TEST_COUPON) return typeInto(state, 'checkout.coupon.input', TEST_COUPON, 'Enter the test coupon');
         return click(state, 'checkout.coupon.apply', 'Apply the test coupon');

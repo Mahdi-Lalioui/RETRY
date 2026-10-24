@@ -62,7 +62,9 @@ describe('API routes (mock + memory)', () => {
     expect(st0.data.phase).toBe('collecting');
     const job = await json(await refresh(post({})));
     expect(job.data.mode).toBe('explicit');
-    const st = await json(await refreshStatus(get(`?jobId=${job.data.jobId}`)));
+    let st = await json(await refreshStatus(get(`?jobId=${job.data.jobId}`)));
+    expect(st.data.phase).toBe('evaluating'); // Agent E: the poll that ends training reports evaluating first
+    for (let i = 0; i < 5 && st.data.phase === 'evaluating'; i++) st = await json(await refreshStatus(get(`?jobId=${job.data.jobId}`)));
     expect(st.data.phase).toBe('promoted');
     expect(st.data.version).toMatchObject({ label: 'v2', rules: ['R1'], promoted: true, examples: 1 });
 

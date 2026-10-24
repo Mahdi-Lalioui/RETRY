@@ -32,7 +32,7 @@ async function main() {
   async function scene(id: string, title: string, caption: string, taskId: string, seed: number, versionIndex: number, bugs: BugId[]) {
     const task = getTask(taskId);
     const start = rec.now();
-    const init = initialState(seed, versionIndex, bugs);
+    const init = initialState(seed, versionIndex, bugs, { collectRequired: task.wantsCollect });
     const versionLabel = (await repo.versions.current()).label;
     rec.add({ kind: 'scene', sceneId: id, title, caption, taskId, goal: task.goal, seed, versionIndex, bugs, layoutTag: init.layout.layoutTag,
       lanes: LANES_SHOWN.map((l) => ({ lane: l, label: LANES[l].label, versionLabel: l === 'adapted' ? versionLabel : l === 'base' ? 'v1' : '' })) });
