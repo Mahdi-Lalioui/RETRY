@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { on } from '@/lib/store/bus';
+import { play } from '@/lib/store/sfx';
 import { useMission } from '@/lib/store/mission';
 
 export function PromotionFX() {
@@ -10,7 +11,7 @@ export function PromotionFX() {
   const reduce = useReducedMotion();
   const label = useMission((s) => s.adapted.label);
   const prev = useMission((s) => s.prevAdaptedLabel);
-  useEffect(() => on('burst', () => setK((x) => x + 1)), []);
+  useEffect(() => on('burst', () => { setK((x) => x + 1); play('chime'); }), []);
   const [show, setShow] = useState(false);
   useEffect(() => {
     if (!k) return;

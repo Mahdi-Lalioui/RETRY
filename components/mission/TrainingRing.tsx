@@ -5,6 +5,7 @@ import { useMission } from '@/lib/store/mission';
 import { REFRESH_MIN_EXAMPLES } from '@/lib/store/lanes';
 import { trainNow } from '@/lib/agent/loop';
 import { Kbd } from '@/components/ui/Kbd';
+import { VersionRail } from './VersionRail';
 
 const R = 76;
 const C = 2 * Math.PI * R;
@@ -40,8 +41,9 @@ export function TrainingRing() {
               : <span className="text-fail">Held back ✕</span>;
 
   return (
-    <section className="panel relative flex min-h-0 min-w-0 items-center gap-3 overflow-hidden p-3">
+    <section className="panel relative flex min-h-0 min-w-0 flex-col overflow-visible p-3">
       <div className="pointer-events-none absolute left-3 top-3 panel-label">Training ring</div>
+      <div className="flex min-h-0 flex-1 items-center gap-3">
       <div className="relative aspect-square h-full max-h-[200px] min-h-0 max-w-[46%] shrink-0 pt-3">
         <svg viewBox="0 0 180 180" className="h-full w-full -rotate-90 overflow-visible">
           <defs>
@@ -83,8 +85,10 @@ export function TrainingRing() {
         >
           ⟳ Train now <Kbd>T</Kbd>
         </button>
-        <div className="caption hidden 2xl:block">Mubit builds a versioned update; promoted only if it beats {adapted.label} on held-out runs</div>
+        <div className="caption hidden 2xl:block" data-dev>Mubit builds a versioned update; promoted only if it beats {adapted.label} on held-out runs</div>
       </div>
+      </div>
+      <VersionRail />
     </section>
   );
 }

@@ -30,7 +30,7 @@ export function BugReportCard({ bug, onClose }: { bug: BugReport; onClose: () =>
   return (
     <motion.div
       initial={{ y: 40, opacity: 0, scale: 0.96 }} animate={{ y: 0, opacity: 1, scale: 1 }} exit={{ y: 30, opacity: 0 }}
-      transition={{ type: 'spring', stiffness: 260, damping: 26, delay: 0.6 }}
+      transition={{ type: 'spring', stiffness: 260, damping: 26, delay: 1.5 }}
       className="pointer-events-auto absolute inset-x-2 bottom-2 z-40 max-h-[62%] overflow-hidden rounded-[10px] border border-fail/45 bg-[#140a0d] shadow-[0_18px_60px_-12px_#F43F5E55]"
     >
       <div className="flex items-center gap-2 border-b border-fail/25 bg-fail/10 px-2.5 py-1.5">
@@ -57,7 +57,7 @@ export function BugReportCard({ bug, onClose }: { bug: BugReport; onClose: () =>
         )}
         <button
           onClick={async () => { try { await navigator.clipboard.writeText(issueMarkdown(bug)); setCopied(true); setTimeout(() => setCopied(false), 1600); } catch { /* clipboard blocked */ } }}
-          className="inline-flex h-6 items-center gap-1.5 rounded-md border border-white/15 bg-white/[0.06] px-2 text-[11px] text-white/85 hover:bg-white/[0.1]"
+          className="inline-flex h-7 items-center gap-1.5 rounded-md border border-fail/60 bg-fail/20 px-2.5 text-[12px] font-semibold text-white hover:bg-fail/30"
         >
           {copied ? <Check className="h-3 w-3 text-pass" /> : <Copy className="h-3 w-3" />}
           {copied ? 'Copied' : 'Copy as GitHub issue'}

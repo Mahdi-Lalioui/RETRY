@@ -8,10 +8,13 @@ import type { AgentAction, Verdict } from '@/lib/agent/types';
 import type { BugId } from '@/lib/shop/state';
 import { TASKS } from '@/lib/shop/tasks';
 import { BUGS } from '@/lib/shop/bugs';
+import Link from 'next/link';
 import { ShopViewport } from './ShopViewport';
 import type { ShopFrame } from './shopFrame';
 import { Wordmark } from './Shell';
 import { actionText } from './ui';
+import { normalizeMetrics } from '@/lib/agent/loop';
+import { fmt } from '@/components/mission/Scoreboard';
 
 const LOOP_MS = 45_000;
 type LaneKey = 'closed' | 'adapted';
@@ -34,6 +37,21 @@ export function AttractView() {
   const [caption, setCaption] = useState<{ big: string; small: string }>({ big: 'RETRY', small: 'The AI QA tester that learns your rules from every rescue.' });
   const [loop, setLoop] = useState(0);
   const [err, setErr] = useState<string | null>(null);
+  const [calls, setCalls] = useState(0);
+  const [ticker, setTicker] = useState<string[]>([]);
+
+  // Live held-out scoreboard for the ticker — real /api/metrics numbers only, refreshed each loop.
+  useEffect(() => {
+    let dead = false;
+    fetch('/api/metrics?scope=heldout').then((x) => x.json()).then((r) => {
+      if (dead || !r?.ok) return;
+      const { rows } = normalizeMetrics(r.data.rows ?? [], r.data.curve ?? []);
+      const cur = r.data.totals?.currentVersion ?? '';
+      const lanes: [string, string][] = [['closed', 'GPT'], ['base', 'Base v1'], ['adapted', `RETRY ${cur}`]];
+      setTicker(rows.filter((row) => !/prompt/i.test(row.label)).map((row) => `${row.label}:  ${lanes.map(([l, n]) => `${n} ${fmt(row.values[l as 'closed'], row.unit)}`).join('  ·  ')}`));
+    }).catch(() => {});
+    return () => { dead = true; };
+  }, [loop]);
 
   useEffect(() => {
     let cancelled = false;
@@ -70,6 +88,7 @@ export function AttractView() {
       for (let i = 0; i < run.steps.length && !cancelled(); i++) {
         const s = run.steps[i];
         await sleep(Math.min(1800, s.latencyMs));
+        setCalls((c) => c + 1);
         setLive((L) => ({ ...L, [k]: { ...L[k], step: i + 1, action: s.action, latency: [...L[k].latency, s.latencyMs], cost: L[k].cost + (s.costUsd ?? 0) } }));
         if (f && s.action.type !== 'done' && s.action.type !== 'report_bug') { try { await f.act(s.action); } catch { /* keep going */ } }
       }
@@ -82,25 +101,35 @@ export function AttractView() {
         : { big: `RETRY ${t.version}: ${a.status.replace('_', ' ')}`, small: a.reason });
   }
 
+  // Esc / Backspace leaves the expo loop.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape' || e.key === 'Backspace') window.location.href = '/'; };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
+  const bigColor = caption.big === 'BUG REPORTED' ? '#F43F5E' : /passes/.test(caption.big) ? '#34D399' : undefined;
+
   return (
-    <div className="relative flex h-screen w-screen flex-col overflow-hidden px-8 pb-8 pt-6">
-      <div className="flex items-center gap-4">
+    <div className="relative flex h-screen w-screen flex-col overflow-hidden px-[clamp(16px,2vw,40px)] pb-0 pt-[clamp(10px,1.6vh,24px)]">
+      <div className="flex shrink-0 items-center gap-4">
         <Wordmark size={26} />
-        <span className="rounded-md border border-[#F59E0B55] bg-[#F59E0B14] px-2 py-0.5 text-[11px] font-semibold tracking-[0.14em] text-[#FCD34D]">NIGHT SHIFT</span>
-        <span className="text-[15px] muted">Self-healing tools guess. RETRY learns your rules from every rescue.</span>
-        <span className="ml-auto mono text-[12px] muted">{turn ? `seed ${turn.seed} · ${turn.closed.layoutTag}` : ''}{turn?.mode === 'mock' ? ' · mock model' : ''} · loop {loop}</span>
+        <span className="rounded-md border border-[#F59E0B55] bg-[#F59E0B14] px-2 py-0.5 text-[12px] font-semibold tracking-[0.14em] text-[#FCD34D]">NIGHT SHIFT</span>
+        <span className="hidden text-[15px] muted xl:inline">Self-healing tools guess. RETRY learns your rules from every rescue.</span>
+        <MubitCounter calls={calls} />
+        <span className="mono hidden text-[12px] muted 2xl:inline">{turn ? `seed ${turn.seed} · ${turn.closed.layoutTag}` : ''}{turn?.mode === 'mock' ? ' · mock model' : ''} · loop {loop}</span>
+        <Link href="/" className="rounded-md border border-white/15 px-2.5 py-1 text-[13px] text-white/80 hover:bg-white/[0.06]">✕ Exit <span className="mono ml-1 rounded border border-white/20 px-1 text-[11px]">Esc</span></Link>
       </div>
-      <div className="mt-5 grid min-h-0 flex-1 grid-cols-2 gap-6">
+      <div className="mt-[clamp(8px,1.4vh,20px)] flex shrink-0 justify-center gap-[clamp(12px,1.4vw,28px)]">
         {(['closed', 'adapted'] as const).map((k) => {
           const color = k === 'closed' ? '#94A3B8' : '#22D3EE';
           const L = live[k];
           const p50 = L.latency.length ? [...L.latency].sort((a, b) => a - b)[Math.floor(L.latency.length / 2)] : null;
           return (
-            <div key={k} className="panel relative flex min-h-0 flex-col p-4" style={{ borderColor: `${color}55` }}>
-              <div className="mb-3 flex items-center gap-3">
+            <div key={k} className="panel relative flex min-w-0 flex-col p-3" style={{ borderColor: `${color}55`, width: 'min(calc(50vw - 40px), calc((100vh - 300px) * 1.6 + 24px))' }}>
+              <div className="mb-2 flex items-center gap-3">
                 <span className="h-2.5 w-2.5 rounded-full" style={{ background: color, boxShadow: `0 0 10px ${color}` }} />
-                <span className="text-[20px] font-semibold">{k === 'closed' ? 'GPT · closed' : `RETRY · open ${turn?.version ?? ''}`}</span>
-                <span className="ml-auto mono text-[14px] muted">steps {L.step} · {p50 ?? '—'}ms · {k === 'closed' ? `$${L.cost.toFixed(4)}` : 'credits'}</span>
+                <span className="whitespace-nowrap text-[clamp(16px,1.1vw,22px)] font-semibold">{k === 'closed' ? 'GPT · closed' : `RETRY · open ${turn?.version ?? ''}`}</span>
+                <span className="mono ml-auto truncate text-[clamp(12px,0.75vw,15px)] muted">steps {L.step} · {p50 ?? '—'}ms · {k === 'closed' ? `$${L.cost.toFixed(4)}` : 'credits'}</span>
               </div>
               <div className="relative">
                 <ShopViewport src={`/shop/10001?lane=${k}&v=2`} color={color} onFrame={(f) => { frames.current[k] = f; }} />
@@ -113,19 +142,45 @@ export function AttractView() {
                   )}
                 </AnimatePresence>
               </div>
-              <div className="mono mt-3 h-6 truncate text-[15px]" style={{ color }}>{L.action ? `${actionText(L.action)}  ` : ''}<span className="muted">{L.action?.reason}</span></div>
+              <div className="mono mt-2 h-6 truncate text-[clamp(13px,0.8vw,16px)]" style={{ color }}>{L.action ? `${actionText(L.action)}  ` : ''}<span className="muted">{L.action?.reason}</span></div>
             </div>
           );
         })}
       </div>
-      <AnimatePresence mode="wait">
-        <motion.div key={caption.big + caption.small} initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.35 }}
-          className="pointer-events-none absolute bottom-10 left-10 z-40 max-w-[1100px] rounded-2xl border border-white/10 bg-[#07080Bd9] px-8 py-6 shadow-2xl backdrop-blur-xl">
-          <div className="text-[52px] font-semibold leading-[1.05] tracking-[-0.03em]" style={{ color: caption.big === 'BUG REPORTED' ? '#F43F5E' : undefined }}>{caption.big}</div>
-          <div className="mt-2 text-[22px] muted">{caption.small}</div>
-        </motion.div>
-      </AnimatePresence>
-      {err && <div className="absolute right-8 top-6 rounded bg-[#F43F5E22] px-3 py-1 text-[12px] text-[#FDA4AF]">{err}</div>}
+      <div className="relative flex min-h-0 flex-1 items-center justify-center px-4">
+        <AnimatePresence mode="wait">
+          <motion.div key={caption.big + caption.small} initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.35 }}
+            className="pointer-events-none max-w-[1500px] text-center">
+            <div className="text-[clamp(28px,3.2vw,64px)] font-semibold leading-[1.05] tracking-[-0.03em]" style={{ color: bigColor }}>{caption.big}</div>
+            <div className="mt-1 line-clamp-2 text-[clamp(15px,1.25vw,26px)] text-[#B8C1CE]">{caption.small}</div>
+          </motion.div>
+        </AnimatePresence>
+      </div>
+      <Ticker items={ticker} />
+      {err && <div className="absolute right-8 top-16 rounded bg-[#F43F5E22] px-3 py-1 text-[12px] text-[#FDA4AF]">{err}</div>}
+    </div>
+  );
+}
+
+function MubitCounter({ calls }: { calls: number }) {
+  return (
+    <span className="ml-auto inline-flex items-center gap-2 rounded-full border border-[#FF450066] bg-[#FF45001a] px-3 py-1">
+      <span className="h-2 w-2 rounded-full bg-[#FF4500] shadow-[0_0_10px_#FF4500]" />
+      <motion.span key={calls} initial={{ y: -6, opacity: 0.4 }} animate={{ y: 0, opacity: 1 }} className="num text-[clamp(15px,1vw,20px)] font-semibold text-white">{calls.toLocaleString('en-GB')}</motion.span>
+      <span className="text-[13px] text-[#FFB08F]">calls routed through Mubit</span>
+    </span>
+  );
+}
+
+function Ticker({ items }: { items: string[] }) {
+  if (!items.length) return <div className="h-[44px] shrink-0" />;
+  const line = items.join('   ◆   ');
+  return (
+    <div className="relative -mx-[clamp(16px,2vw,40px)] h-[44px] shrink-0 overflow-hidden border-t border-white/10 bg-[#0D1016]">
+      <span className="absolute left-0 top-0 z-10 flex h-full items-center bg-[#22D3EE] px-4 text-[13px] font-bold uppercase tracking-[0.14em] text-[#07080B]">Held-out scoreboard</span>
+      <div className="ticker-track mono flex h-full items-center whitespace-nowrap text-[15px] text-white/85">
+        <span className="pr-16">{line}</span><span className="pr-16" aria-hidden>{line}</span>
+      </div>
     </div>
   );
 }

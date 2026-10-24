@@ -91,7 +91,7 @@ export function TopBar() {
         >
           {layoutTag}
         </motion.span>
-        <span className="hidden shrink-0 font-mono text-[11px] text-faint lg:inline">seed {seed}</span>
+        <span data-dev className="hidden shrink-0 font-mono text-[11px] text-faint lg:inline">seed {seed}</span>
         <AnimatePresence>
           {bugs.length > 0 && (
             <motion.span initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.8 }}
@@ -104,7 +104,7 @@ export function TopBar() {
 
       <div className="flex items-center gap-3">
         <MubitPill />
-        <Clock />
+        <span data-dev><Clock /></span>
       </div>
     </header>
   );
